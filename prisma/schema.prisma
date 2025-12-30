@@ -42,6 +42,17 @@ model Task {
   updatedAt      DateTime  @updatedAt
 
   timeLogs       TimeLog[]
+  submissions    Submission[]
+  feedback       String?   // Admin feedback for rejection
+}
+
+model Submission {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
+  type      String   // "IMAGE" or "LINK"
+  url       String
+  createdAt DateTime @default(now())
 }
 
 model TimeLog {

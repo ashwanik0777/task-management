@@ -152,7 +152,7 @@ export async function resumeTask(taskId: string) {
   revalidatePath('/intern')
 }
 
-export async function completeTask(taskId: string) {
+export async function completeTask(taskId: string, submissions: { type: string, url: string }[]) {
   const session = await auth()
   if (!session) throw new Error("Unauthorized")
 
@@ -171,9 +171,33 @@ export async function completeTask(taskId: string) {
 
   await prisma.task.update({
     where: { id: taskId },
-    data: { status: 'COMPLETED' }
+    data: { 
+      status: 'UNDER_REVIEW',
+      submissions: {
+        create: submissions
+      }
+    }
   })
 
+  revalidatePath('/intern')
+  revalidatePath('/admin')
+}
+
+export async function reviewTask(taskId: string, decision: 'APPROVED' | 'REJECTED', feedback?: string) {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
+
+  const status = decision === 'APPROVED' ? 'COMPLETED' : 'REJECTED'
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data: { 
+      status,
+      feedback: feedback || null
+    }
+  })
+
+  revalidatePath('/admin')
   revalidatePath('/intern')
 }
 

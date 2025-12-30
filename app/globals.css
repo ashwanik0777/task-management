@@ -1,7 +1,10 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --animate-in: enter 150ms ease-out;
+
   --animate-out: exit 150ms ease-in;
 }
 

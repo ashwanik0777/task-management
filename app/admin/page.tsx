@@ -11,7 +11,7 @@ export default async function AdminPage() {
   if (!session || (session.user as any).role !== 'ADMIN') redirect("/")
 
   const tasks = await prisma.task.findMany({
-    include: { assignedTo: true },
+    include: { assignedTo: true, submissions: true },
     orderBy: { createdAt: 'desc' }
   })
 
