@@ -63,3 +63,8 @@ model TimeLog {
   endTime   DateTime?
   type      String    // "WORK", "PAUSE"
 }
+
+model SiteStats {
+  id        String   @id @default(uuid())
+  views     Int      @default(0)
+}

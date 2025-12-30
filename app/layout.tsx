@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 import Provider from "@/components/SessionProvider"
 import Navbar from "@/components/Navbar"
+import Footer from "@/components/Footer"
 import { ThemeProvider } from "@/components/ThemeProvider"
 
 export default function RootLayout({
@@ -29,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-300`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-300`}
       >
         <ThemeProvider
           attribute="class"
@@ -39,9 +40,10 @@ export default function RootLayout({
         >
           <Provider>
             <Navbar />
-            <main className="p-4 max-w-7xl mx-auto min-h-[calc(100vh-64px)]">
+            <main className="p-4 max-w-7xl mx-auto w-full flex-1">
               {children}
             </main>
+            <Footer />
           </Provider>
         </ThemeProvider>
       </body>
