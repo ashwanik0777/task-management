@@ -36,7 +36,7 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
             <input 
               type="email" 
-              placeholder="name@company.com" 
+              placeholder="ashwani@gmail.com" 
               value={email} 
               onChange={e => setEmail(e.target.value)}
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:bg-gray-800 dark:border-gray-700"

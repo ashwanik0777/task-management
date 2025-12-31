@@ -36,7 +36,7 @@ export default function RegisterPage() {
               name="name"
               type="text" 
               required
-              placeholder="John Doe" 
+              placeholder="Ashwani" 
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:bg-gray-800 dark:border-gray-700"
             />
           </div>
@@ -46,7 +46,7 @@ export default function RegisterPage() {
               name="email"
               type="email" 
               required
-              placeholder="name@company.com" 
+              placeholder="ashwani@gmail.com" 
               className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:bg-gray-800 dark:border-gray-700"
             />
           </div>
