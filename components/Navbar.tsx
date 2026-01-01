@@ -15,15 +15,30 @@ export default function Navbar() {
         
         {session ? (
           <>
-            <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                {session.user?.name} <span className="text-xs opacity-70">({(session.user as any)?.role})</span>
-              </span>
-            </div>
+            {(session.user as any)?.role === 'INTERN' ? (
+              <Link href="/intern/profile" className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {session.user?.name} <span className="text-xs opacity-70">({(session.user as any)?.role})</span>
+                </span>
+              </Link>
+            ) : (
+              <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {session.user?.name} <span className="text-xs opacity-70">({(session.user as any)?.role})</span>
+                </span>
+              </div>
+            )}
+            
             {/* Mobile User Indicator */}
-            <div className="md:hidden w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
-              {session.user?.name?.charAt(0).toUpperCase()}
-            </div>
+            {(session.user as any)?.role === 'INTERN' ? (
+              <Link href="/intern/profile" className="md:hidden w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                {session.user?.name?.charAt(0).toUpperCase()}
+              </Link>
+            ) : (
+              <div className="md:hidden w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                {session.user?.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
             <button onClick={() => signOut()} className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400" title="Sign Out">
               <LogOut size={20} />
             </button>
