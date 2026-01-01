@@ -16,12 +16,21 @@ model User {
   email         String    @unique
   password      String
   role          String    // "ADMIN" or "INTERN"
+  rollNumber    String?   @unique // For Interns: 222UCS001
   status        String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   assignedTasks Task[]    @relation("AssignedTo")
   createdTasks  Task[]    @relation("CreatedBy")
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Task {

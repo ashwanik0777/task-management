@@ -59,3 +59,39 @@ export async function sendTaskAssignmentEmail(
     throw error;
   }
 }
+
+export async function sendOtpEmail(to: string, otp: string) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+    console.warn("SMTP credentials not set. Skipping email.");
+    return;
+  }
+
+  const mailOptions = {
+    from: process.env.SMTP_FROM_EMAIL || '"TaskMaster" <no-reply@taskmaster.com>',
+    to,
+    subject: `Your Verification Code: ${otp}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Verification Code</h2>
+        <p>Hello,</p>
+        <p>Your verification code for <strong>TaskMaster</strong> is:</p>
+        
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+          <h1 style="margin: 0; letter-spacing: 5px; color: #333;">${otp}</h1>
+        </div>
+
+        <p>This code will expire in 10 minutes.</p>
+        <p>If you did not request this code, please ignore this email.</p>
+      </div>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("OTP sent: %s", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    throw error;
+  }
+}
