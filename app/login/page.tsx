@@ -2,24 +2,39 @@
 import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    })
-    if (res?.ok) {
-      router.push("/")
-      router.refresh()
-    } else {
-      alert("Invalid credentials")
+    setError("")
+    setLoading(true)
+    
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (res?.error) {
+        // Since we return null from authorize on failure, we get a generic error
+        // We show a generic message for security
+        setError("Invalid email or password")
+      } else if (res?.ok) {
+        router.push("/")
+        router.refresh()
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -30,6 +45,13 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Welcome Back</h1>
           <p className="text-gray-500 mt-2">Sign in to your account</p>
         </div>
+        
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 rounded-lg flex items-center gap-2 text-sm">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
         
         <div className="space-y-4">
           <div>
@@ -57,8 +79,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 rounded-lg font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/30">
-          Sign In
+        <button 
+          type="submit" 
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 rounded-lg font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-blue-500/30 disabled:opacity-50 flex justify-center items-center"
+        >
+          {loading ? "Signing in..." : "Sign In"}
         </button>
       </form>
     </div>
