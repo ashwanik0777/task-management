@@ -18,6 +18,9 @@ model User {
   role          String    // "ADMIN" or "INTERN"
   rollNumber    String?   @unique // For Interns: 222UCS001
   status        String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  avatarUrl     String?
+  bio           String?
+  skills        String?   // Comma separated skills
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
