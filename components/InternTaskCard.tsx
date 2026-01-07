@@ -1,12 +1,14 @@
 'use client'
 import { useState, useEffect } from "react"
 import { respondToTask, startTask, pauseTask, resumeTask, completeTask } from "@/app/actions"
+import { getCloudinarySignature } from "@/app/upload-actions"
 import { format, differenceInSeconds } from "date-fns"
 import { Play, Pause, CheckCircle, XCircle, Clock, Upload, Link as LinkIcon, Trash2, AlertTriangle, Loader2 } from "lucide-react"
 
 export default function InternTaskCard({ task }: { task: any }) {
   const [elapsed, setElapsed] = useState(0)
   const [responseLeft, setResponseLeft] = useState(0)
+  const [deadlineLeft, setDeadlineLeft] = useState(0)
   const [declineReason, setDeclineReason] = useState("")
   const [showDecline, setShowDecline] = useState(false)
   
@@ -15,9 +17,11 @@ export default function InternTaskCard({ task }: { task: any }) {
   const [submissions, setSubmissions] = useState<{type: 'LINK' | 'IMAGE', url: string}[]>([])
   const [newLink, setNewLink] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
-  // Calculate initial elapsed time
+  // Calculate work timer and deadline countdown
   useEffect(() => {
+    // Work timer
     const calculateElapsed = () => {
       let total = 0
       task.timeLogs.forEach((log: any) => {
@@ -29,29 +33,40 @@ export default function InternTaskCard({ task }: { task: any }) {
       setElapsed(total)
     }
     
+    // Deadline Countdown (for active tasks)
+    const calculateDeadline = () => {
+        const deadline = new Date(task.deadline)
+        const left = differenceInSeconds(deadline, new Date())
+        setDeadlineLeft(left > 0 ? left : 0)
+    }
+    
     calculateElapsed()
-    const interval = setInterval(calculateElapsed, 1000)
+    calculateDeadline()
+    const interval = setInterval(() => {
+        calculateElapsed()
+        calculateDeadline()
+    }, 1000)
     return () => clearInterval(interval)
-  }, [task.timeLogs, task.status])
+  }, [task.timeLogs, task.status, task.deadline])
 
-  // Calculate response deadline countdown
+  // Calculate 30-min response window countdown
   useEffect(() => {
     if (task.status !== 'PENDING') return
     
-    const updateCountdown = () => {
-      // Use the actual task deadline, not a hardcoded 30 minutes
-      const deadline = new Date(task.deadline)
-      const left = differenceInSeconds(deadline, new Date())
+    const updateResponseCountdown = () => {
+      // 30 minutes from creation
+      const responseDeadline = new Date(new Date(task.createdAt).getTime() + 30 * 60000)
+      const left = differenceInSeconds(responseDeadline, new Date())
       setResponseLeft(left > 0 ? left : 0)
     }
     
-    updateCountdown()
-    const interval = setInterval(updateCountdown, 1000)
+    updateResponseCountdown()
+    const interval = setInterval(updateResponseCountdown, 1000)
     return () => clearInterval(interval)
-  }, [task.deadline, task.status])
+  }, [task.createdAt, task.status])
 
-  // Helper boolean to check if deadline has passed
-  const isDeadlineOver = responseLeft === 0 && task.status === 'PENDING'
+  // Helper boolean to check if response window has passed
+  const isResponseWindowOver = responseLeft === 0 && task.status === 'PENDING'
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600)
@@ -79,21 +94,41 @@ export default function InternTaskCard({ task }: { task: any }) {
     setNewLink("")
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (submissions.length >= 10) return alert("Maximum 10 attachments allowed")
-    
-    // In a real app, upload to Cloudinary here.
-    // For now, we'll simulate it by creating a fake URL or using a placeholder.
-    // Since we can't easily do unsigned upload without credentials in env, 
-    // we will just pretend.
-    
-    // Simulating upload delay
-    setTimeout(() => {
-      const fakeUrl = `https://res.cloudinary.com/demo/image/upload/${file.name}`
-      setSubmissions([...submissions, { type: 'IMAGE', url: fakeUrl }])
-    }, 1000)
+
+    setUploading(true)
+    try {
+      // Get signature from server
+      const { timestamp, signature } = await getCloudinarySignature()
+      
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('api_key', process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY || '') 
+      formData.append('timestamp', timestamp.toString())
+      formData.append('signature', signature)
+      formData.append('folder', 'task-submissions')
+
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      
+      const data = await res.json()
+      if (data.secure_url) {
+        setSubmissions([...submissions, { type: 'IMAGE', url: data.secure_url }])
+      } else {
+        alert("Upload failed")
+      }
+    } catch (e) {
+      console.error(e)
+      alert("Error uploading image")
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleSubmitTask = async () => {
@@ -122,13 +157,21 @@ export default function InternTaskCard({ task }: { task: any }) {
           <h3 className="font-bold text-xl text-gray-800 dark:text-gray-100 group-hover:text-blue-600 transition-colors">{task.title}</h3>
           <p className="text-sm text-gray-500 mt-1 leading-relaxed">{task.description}</p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
-          task.priority === 'HIGH' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-          task.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-        }`}>
-          {task.priority}
-        </span>
+        <div className="flex flex-col items-end gap-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase ${
+            task.priority === 'HIGH' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+            task.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          }`}>
+            {task.priority}
+          </span>
+          {/* Show Deadline Timer when Active */}
+          {(task.status === 'ACCEPTED' || task.status === 'IN_PROGRESS') && (
+            <span className={`text-xs font-mono font-bold ${deadlineLeft < 3600 ? 'text-red-500' : 'text-gray-500'}`}>
+               Due in: {formatTime(deadlineLeft)}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-between items-center mt-6 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
@@ -138,7 +181,7 @@ export default function InternTaskCard({ task }: { task: any }) {
         </div>
         <div className="font-mono text-xl font-bold flex items-center gap-2 text-blue-600 dark:text-blue-400">
           <Clock size={20} className="animate-pulse" />
-          {formatTime(elapsed)}
+          {task.status === 'PENDING' ? '--:--:--' : formatTime(elapsed)}
         </div>
       </div>
 
@@ -152,11 +195,11 @@ export default function InternTaskCard({ task }: { task: any }) {
       <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
         {task.status === 'PENDING' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {!isDeadlineOver ? (
+            {!isResponseWindowOver ? (
               <>
                 <div className="mb-3 text-sm font-bold flex items-center gap-2 text-orange-600 bg-orange-50 dark:bg-orange-900/20 p-2 rounded">
                   <Clock size={14} />
-                  Response required in: {Math.floor(responseLeft / 3600)}h {Math.floor((responseLeft % 3600) / 60)}m {responseLeft % 60}s
+                  Response required in: {formatTime(responseLeft)}
                 </div>
                 {!showDecline ? (
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -180,7 +223,7 @@ export default function InternTaskCard({ task }: { task: any }) {
               </>
             ) : (
               <div className="text-center text-red-600 font-bold flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900">
-                <Clock size={20} /> Deadline Over - Task Expired
+                <Clock size={20} /> Response Window Expired
               </div>
             )}
           </div>
@@ -226,12 +269,14 @@ export default function InternTaskCard({ task }: { task: any }) {
               <div className="relative">
                 <input 
                   type="file" 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={uploading}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                   onChange={handleFileUpload}
                   accept="image/*"
                 />
                 <div className="w-full p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
-                  <Upload size={16} /> Upload Image (Cloudinary)
+                  <Upload size={16} /> 
+                  {uploading ? "Uploading..." : "Upload Image (Cloudinary)"}
                 </div>
               </div>
             </div>

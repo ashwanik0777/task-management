@@ -9,6 +9,13 @@ export default function CreateTaskForm({ interns }: { interns: any[] }) {
   const handleSubmit = async (formData: FormData) => {
     setLoading(true)
     try {
+      // Fix timezone issue: Convert local datetime input to UTC ISO string
+      const deadlineInput = formData.get('deadline') as string
+      if (deadlineInput) {
+        const localDate = new Date(deadlineInput)
+        formData.set('deadline', localDate.toISOString())
+      }
+
       await createTask(formData)
       // We could add a toast here, but for now alert is fine, or we could just reset the form
       // Ideally we should use useFormStatus but we are in a client component wrapper
