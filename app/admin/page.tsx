@@ -11,9 +11,20 @@ export default async function AdminPage() {
   if (!session || (session.user as any).role !== 'ADMIN') redirect("/")
 
   const tasks = await prisma.task.findMany({
-    include: { assignedTo: true, submissions: true },
+    include: { assignedTo: true, submissions: true, timeLogs: true }, // Added timeLogs
     orderBy: { createdAt: 'desc' }
   })
+  
+  // Group tasks by assignedToId and keep only the latest one
+  const latestTasksMap = new Map();
+  tasks.forEach(task => {
+    if (!task.assignedToId) return;
+    if (!latestTasksMap.has(task.assignedToId)) {
+      latestTasksMap.set(task.assignedToId, task);
+    }
+  });
+
+  const latestTasks = Array.from(latestTasksMap.values());
 
   const interns = await getInterns()
 
@@ -98,13 +109,16 @@ export default async function AdminPage() {
         
         <div className="lg:col-span-2">
           <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Users className="text-blue-600 dark:text-blue-400" size={20} />
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <ListTodo className="text-blue-600 dark:text-blue-400" size={20} />
+                </div>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Latest Task Overview (One per Intern)</h2>
               </div>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Task Overview</h2>
+              <a href="/admin/interns" className="text-sm text-blue-600 hover:underline">View All in Profiles</a>
             </div>
-            <AdminTaskList tasks={tasks} />
+            <AdminTaskList tasks={latestTasks} />
           </div>
         </div>
       </div>

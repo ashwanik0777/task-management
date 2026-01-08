@@ -56,6 +56,26 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
     setActiveMenu(activeMenu === taskId ? null : taskId)
   }
 
+  const calculateWorkHours = (timeLogs: any[]) => {
+    if (!timeLogs || timeLogs.length === 0) return "0h 0m"
+    
+    let totalSeconds = 0
+    timeLogs.forEach(log => {
+      if (log.type === 'WORK') {
+        const start = new Date(log.startTime)
+        // If endTime is null (currently working), use current time or just start time? 
+        // Admin view is passive, let's use endTime if present, else just calculate till now
+        const end = log.endTime ? new Date(log.endTime) : new Date() 
+        const diff = (end.getTime() - start.getTime()) / 1000
+        totalSeconds += diff > 0 ? diff : 0
+      }
+    })
+
+    const h = Math.floor(totalSeconds / 3600)
+    const m = Math.floor((totalSeconds % 3600) / 60)
+    return `${h}h ${m}m`
+  }
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 min-h-[400px]">
       {/* Mobile Card View */}
@@ -363,9 +383,9 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Status</label>
-                  <div className="mt-1">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Status & Time</label>
+                  <div className="mt-1 flex flex-col gap-2">
+                    <span className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       viewingTask.status === 'COMPLETED' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
                       viewingTask.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
                       viewingTask.status === 'UNDER_REVIEW' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
@@ -374,6 +394,11 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
                     }`}>
                       {viewingTask.status.replace('_', ' ')}
                     </span>
+                    {(viewingTask.status === 'IN_PROGRESS' || viewingTask.status === 'COMPLETED' || viewingTask.status === 'UNDER_REVIEW') && (
+                      <span className="inline-flex w-fit items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        <Clock size={12} /> {calculateWorkHours(viewingTask.timeLogs)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
