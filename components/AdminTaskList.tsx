@@ -92,8 +92,6 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
     timeLogs.forEach(log => {
       if (log.type === 'WORK') {
         const start = new Date(log.startTime)
-        // If endTime is null (currently working), use current time or just start time? 
-        // Admin view is passive, let's use endTime if present, else just calculate till now
         const end = log.endTime ? new Date(log.endTime) : new Date() 
         const diff = (end.getTime() - start.getTime()) / 1000
         totalSeconds += diff > 0 ? diff : 0
@@ -227,7 +225,6 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold text-xs">
             <tr>
-              {/* <th className="p-4">Task Details</th> */}
               <th className="p-4">Assigned To</th>
               <th className="p-4">Status</th>
               <th className="p-4">Priority</th>
@@ -238,10 +235,6 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {filteredTasks.map(task => (
               <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
-                {/* <td className="p-4">
-                  <div className="font-bold text-gray-900 dark:text-gray-100">{task.title}</div>
-                  <div className="text-xs text-gray-500 mt-1 truncate max-w-[200px]">{task.description}</div>
-                </td> */}
                 <td className="p-4">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">

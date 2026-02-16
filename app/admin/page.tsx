@@ -19,12 +19,10 @@ export default async function AdminPage() {
     include: { assignedTo: true, submissions: true, timeLogs: true },
   })
 
-  // Sort by most recently created/updated
   latestTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const interns = await getInterns()
   
-  // Parallel efficient counting
   const [total, completed, inProgress, noResponse] = await Promise.all([
     prisma.task.count(),
     prisma.task.count({ where: { status: 'COMPLETED' } }),

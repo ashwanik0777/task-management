@@ -21,7 +21,6 @@ export async function createTask(formData: FormData) {
   const sendEmail = formData.get('sendEmail') === 'on'
 
   if (assignedToId === 'ALL') {
-    // Fetch all approved interns
     const interns = await prisma.user.findMany({
       where: {
         role: 'INTERN',
@@ -90,11 +89,7 @@ export async function deleteTask(taskId: string) {
     throw new Error("Unauthorized")
   }
 
-  // Delete related records first if cascade isn't set up (Prisma usually handles this if configured, but let's be safe or rely on cascade)
-  // Assuming cascade delete is configured in schema or we just delete the task.
-  // Let's check schema.prisma first? No, let's just try deleting.
-  // Actually, timeLogs and submissions are related.
-  
+
   await prisma.timeLog.deleteMany({ where: { taskId } })
   await prisma.submission.deleteMany({ where: { taskId } })
   await prisma.task.delete({ where: { id: taskId } })
@@ -136,8 +131,6 @@ export async function startTask(taskId: string) {
   const session = await auth()
   if (!session) throw new Error("Unauthorized")
 
-  // FIX: Close ALL open logs for this task to prevent "double active" data corruption
-  // This solves the timer running "super fast" if multiple start requests hit simultaneously
   await prisma.timeLog.updateMany({
     where: { 
       taskId, 
@@ -287,8 +280,8 @@ export async function reassignTask(taskId: string) {
   await prisma.task.update({
     where: { id: taskId },
     data: { 
-      createdAt: new Date(), // Reset timer
-      status: 'PENDING',     // Reset status
+      createdAt: new Date(), 
+      status: 'PENDING',    
       title: task.title.includes("(Reassigned)") ? task.title : `(Reassigned) ${task.title}`
     }
   })
