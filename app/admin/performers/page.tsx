@@ -57,8 +57,6 @@ export default async function PerformersPage() {
       // Sort by start time
       ranges.sort((a, b) => a.start - b.start);
 
-      // Merge overlapping (or contained) intervals
-      // E.g., [10:00-11:00] and [10:30-11:30] becomes [10:00-11:30] (1.5h instead of 2h)
       const mergedRanges: { start: number, end: number }[] = [];
       if (ranges.length > 0) {
         let current = ranges[0];

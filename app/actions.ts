@@ -369,22 +369,27 @@ export async function incrementViewCount() {
   const cookieStore = await cookies()
   const hasViewed = cookieStore.get('has_viewed_site')
 
-  // Get the stats record (create if not exists)
-  let stats = await prisma.siteStats.findFirst()
-  if (!stats) {
-    stats = await prisma.siteStats.create({ data: { views: 0 } })
-  }
+  try {
+    // Get the stats record (create if not exists)
+    let stats = await prisma.siteStats.findFirst()
+    if (!stats) {
+      stats = await prisma.siteStats.create({ data: { views: 0 } })
+    }
 
-  if (!hasViewed) {
-    // Increment view count
-    stats = await prisma.siteStats.update({
-      where: { id: stats.id },
-      data: { views: { increment: 1 } }
-    })
-    
-    // Set cookie for 24 hours
-    cookieStore.set('has_viewed_site', 'true', { maxAge: 60 * 60 * 24 })
-  }
+    if (!hasViewed) {
+      // Increment view count
+      stats = await prisma.siteStats.update({
+        where: { id: stats.id },
+        data: { views: { increment: 1 } }
+      })
 
-  return stats.views
+      // Set cookie for 24 hours
+      cookieStore.set('has_viewed_site', 'true', { maxAge: 60 * 60 * 24 })
+    }
+
+    return stats.views
+  } catch (error) {
+    console.error("incrementViewCount failed:", error)
+    return 0
+  }
 }

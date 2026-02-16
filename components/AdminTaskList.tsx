@@ -1,7 +1,7 @@
 'use client'
 import { format } from "date-fns"
-import { MoreHorizontal, Calendar, Clock, AlertCircle, Eye, Check, X, ExternalLink, FileText, Trash2, CornerDownLeft, RefreshCw } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+import { MoreHorizontal, Calendar, Clock, Eye, Check, X, ExternalLink, FileText, Trash2, RefreshCw } from "lucide-react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { reviewTask, deleteTask, reassignTask } from "@/app/actions"
 
 export default function AdminTaskList({ tasks }: { tasks: any[] }) {
@@ -10,7 +10,22 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
   const [feedback, setFeedback] = useState("")
   const [processing, setProcessing] = useState(false)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [nameFilter, setNameFilter] = useState("")
+  const [deadlineFilter, setDeadlineFilter] = useState("")
+  const [priorityFilter, setPriorityFilter] = useState("ALL")
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const filteredTasks = useMemo(() => {
+    const normalizedName = nameFilter.trim().toLowerCase()
+
+    return tasks.filter((task) => {
+      const matchesName = !normalizedName || task.assignedTo?.name?.toLowerCase().includes(normalizedName)
+      const matchesPriority = priorityFilter === "ALL" || task.priority === priorityFilter
+      const matchesDeadline = !deadlineFilter || format(new Date(task.deadline), 'yyyy-MM-dd') === deadlineFilter
+
+      return matchesName && matchesPriority && matchesDeadline
+    })
+  }, [tasks, nameFilter, priorityFilter, deadlineFilter])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -92,9 +107,39 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 min-h-[400px]">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            value={nameFilter}
+            onChange={(e) => setNameFilter(e.target.value)}
+            placeholder="Filter by intern name"
+            className="w-full p-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+
+          <input
+            type="date"
+            value={deadlineFilter}
+            onChange={(e) => setDeadlineFilter(e.target.value)}
+            className="w-full p-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="w-full p-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="ALL">All Priorities</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+        </div>
+      </div>
+
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4 p-4">
-        {tasks.map(task => (
+        {filteredTasks.map(task => (
           <div key={task.id} className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative">
             <div className="absolute top-4 right-4">
               <button onClick={(e) => openMenu(e, task.id)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
@@ -191,7 +236,7 @@ export default function AdminTaskList({ tasks }: { tasks: any[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {tasks.map(task => (
+            {filteredTasks.map(task => (
               <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
                 {/* <td className="p-4">
                   <div className="font-bold text-gray-900 dark:text-gray-100">{task.title}</div>

@@ -1,13 +1,23 @@
 'use client'
 import { createTask } from "@/app/actions"
-import { useState } from "react"
+import { FormEvent, useRef, useState } from "react"
 import { Calendar, User, Flag, Type, FileText, Send } from "lucide-react"
 
 export default function CreateTaskForm({ interns }: { interns: any[] }) {
   const [loading, setLoading] = useState(false)
+  const submittingRef = useRef(false)
 
-  const handleSubmit = async (formData: FormData) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (loading || submittingRef.current) return
+
+    submittingRef.current = true
     setLoading(true)
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+
     try {
       // Fix timezone issue: Convert local datetime input to UTC ISO string
       const deadlineInput = formData.get('deadline') as string
@@ -17,20 +27,18 @@ export default function CreateTaskForm({ interns }: { interns: any[] }) {
       }
 
       await createTask(formData)
-      // We could add a toast here, but for now alert is fine, or we could just reset the form
-      // Ideally we should use useFormStatus but we are in a client component wrapper
-      const form = document.querySelector('form') as HTMLFormElement
       form?.reset()
       alert("Task assigned successfully!")
     } catch (e) {
       alert("Error assigning task")
     } finally {
+      submittingRef.current = false
       setLoading(false)
     }
   }
 
   return (
-    <form action={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
           <Type size={16} /> Title
@@ -117,6 +125,7 @@ export default function CreateTaskForm({ interns }: { interns: any[] }) {
       </div>
 
       <button 
+        type="submit"
         disabled={loading} 
         className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
       >

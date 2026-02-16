@@ -142,7 +142,7 @@ export default async function AdminPage() {
                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                   <ListTodo className="text-blue-600 dark:text-blue-400" size={20} />
                 </div>
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Latest Task Overview (One per Intern)</h2>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Latest Task Overview</h2>
               </div>
               <a href="/admin/interns" className="text-sm text-blue-600 hover:underline">View All in Profiles</a>
             </div>
