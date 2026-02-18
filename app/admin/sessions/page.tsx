@@ -2,14 +2,14 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { ArrowLeft, PanelTop } from "lucide-react"
 import Link from "next/link"
-import { getAllWorkSessionsForAdmin } from "@/app/actions"
+import { getSessionCenterOverview } from "@/app/actions"
 import AdminSessionsCenter from "@/components/AdminSessionsCenter"
 
 export default async function AdminSessionsPage() {
   const session = await auth()
   if (!session || (session.user as any).role !== 'ADMIN') redirect("/")
 
-  const sessions = await getAllWorkSessionsForAdmin()
+  const overview = await getSessionCenterOverview()
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
@@ -30,7 +30,11 @@ export default async function AdminSessionsPage() {
         </Link>
       </div>
 
-      <AdminSessionsCenter sessions={sessions} />
+      <AdminSessionsCenter
+        sessions={overview.sessions}
+        current={overview.current}
+        history={overview.history}
+      />
     </div>
   )
 }

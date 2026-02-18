@@ -89,6 +89,29 @@ model SiteStats {
   views     Int      @default(0)
 }
 
+model SessionControl {
+  id                    String   @id
+  year                  Int
+  currentSessionNumber  Int
+  currentSessionStartedAt DateTime
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model SessionHistory {
+  id            String   @id @default(uuid())
+  year          Int
+  sessionNumber Int
+  startedAt     DateTime
+  endedAt       DateTime
+  activeClosed  Int      @default(0)
+  snapshot      Json
+  createdAt     DateTime @default(now())
+
+  @@index([year, sessionNumber])
+  @@index([endedAt])
+}
+
 model WorkSession {
   id          String    @id @default(uuid())
   internId    String

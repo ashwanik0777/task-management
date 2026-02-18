@@ -422,6 +422,91 @@ type AdminSessionListItem = {
   }[]
 }
 
+type SnapshotLeaderboardItem = {
+  internId: string
+  name: string
+  completed: number
+  totalHours: number
+  score: number
+}
+
+async function ensureSessionControl() {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+
+  const control = await prisma.sessionControl.upsert({
+    where: { id: 'global' },
+    update: {},
+    create: {
+      id: 'global',
+      year: currentYear,
+      currentSessionNumber: 1,
+      currentSessionStartedAt: now,
+    }
+  })
+
+  return control
+}
+
+async function buildSessionLeaderboardSnapshot(): Promise<SnapshotLeaderboardItem[]> {
+  const interns = await prisma.user.findMany({
+    where: { role: 'INTERN', status: 'APPROVED' },
+    include: {
+      assignedTasks: {
+        include: { timeLogs: true }
+      }
+    }
+  })
+
+  return interns
+    .map((intern) => {
+      const completed = intern.assignedTasks.filter((task) => task.status === 'COMPLETED').length
+
+      const totalSeconds = intern.assignedTasks.reduce((acc, task) => {
+        const taskSeconds = task.timeLogs
+          .filter((log) => log.type === 'WORK' && log.endTime)
+          .reduce((sum, log) => sum + ((log.endTime!.getTime() - log.startTime.getTime()) / 1000), 0)
+        return acc + taskSeconds
+      }, 0)
+
+      const totalHours = Math.floor(totalSeconds / 3600)
+      const score = (completed * 25) + (totalHours * 2)
+
+      return {
+        internId: intern.id,
+        name: intern.name,
+        completed,
+        totalHours,
+        score,
+      }
+    })
+    .sort((a, b) => b.score - a.score || b.completed - a.completed)
+}
+
+export async function getSessionCenterOverview() {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
+
+  const [control, sessions, history] = await Promise.all([
+    ensureSessionControl(),
+    getAllWorkSessionsForAdmin(),
+    prisma.sessionHistory.findMany({
+      orderBy: [{ year: 'desc' }, { sessionNumber: 'desc' }],
+      take: 30,
+    })
+  ])
+
+  return {
+    sessions,
+    current: {
+      year: control.year,
+      sessionNumber: control.currentSessionNumber,
+      startedAt: control.currentSessionStartedAt,
+    },
+    history,
+  }
+}
+
 export async function getAllWorkSessionsForAdmin(): Promise<AdminSessionListItem[]> {
   const session = await auth()
   if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
@@ -469,14 +554,71 @@ export async function endAllActiveWorkSessions() {
   const session = await auth()
   if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
 
+  const control = await ensureSessionControl()
   const now = new Date()
   const activeSessions = await prisma.workSession.findMany({
     where: { status: 'ACTIVE' },
     select: { id: true, internId: true }
   })
 
+  const [taskOverview, leaderboard] = await Promise.all([
+    Promise.all([
+      prisma.task.count(),
+      prisma.task.count({ where: { status: 'COMPLETED' } }),
+      prisma.task.count({ where: { status: 'IN_PROGRESS' } }),
+      prisma.task.count({ where: { status: 'UNDER_REVIEW' } }),
+    ]),
+    buildSessionLeaderboardSnapshot(),
+  ])
+
+  const [totalTasks, completedTasks, inProgressTasks, underReviewTasks] = taskOverview
+  const winners = leaderboard.slice(0, 3)
+  const activeInterns = await prisma.user.findMany({
+    where: { id: { in: Array.from(new Set(activeSessions.map((item) => item.internId))) } },
+    select: { id: true, name: true, email: true, rollNumber: true }
+  })
+
+  const archiveYear = control.year
+  const archiveSessionNumber = control.currentSessionNumber
+
+  await prisma.sessionHistory.create({
+    data: {
+      year: archiveYear,
+      sessionNumber: archiveSessionNumber,
+      startedAt: control.currentSessionStartedAt,
+      endedAt: now,
+      activeClosed: activeSessions.length,
+      snapshot: {
+        taskOverview: {
+          totalTasks,
+          completedTasks,
+          inProgressTasks,
+          underReviewTasks,
+        },
+        leaderboard,
+        winners,
+        activeInterns,
+      }
+    }
+  })
+
   if (activeSessions.length === 0) {
-    return { endedCount: 0, startedCount: 0 }
+    const resetYear = now.getFullYear()
+    await prisma.sessionControl.update({
+      where: { id: 'global' },
+      data: {
+        year: resetYear,
+        currentSessionNumber: control.year === resetYear ? control.currentSessionNumber + 1 : 1,
+        currentSessionStartedAt: now,
+      }
+    })
+
+    revalidatePath('/admin')
+    revalidatePath('/admin/sessions')
+    revalidatePath('/intern')
+    revalidatePath('/admin/interns')
+
+    return { endedCount: 0, startedCount: 0, archivedYear: archiveYear, archivedSessionNumber: archiveSessionNumber }
   }
 
   const activeSessionIds = activeSessions.map((item) => item.id)
@@ -501,12 +643,71 @@ export async function endAllActiveWorkSessions() {
     })
   })
 
+  const nextYear = now.getFullYear()
+  const nextSessionNumber = control.year === nextYear
+    ? control.currentSessionNumber + 1
+    : 1
+
+  await prisma.sessionControl.update({
+    where: { id: 'global' },
+    data: {
+      year: nextYear,
+      currentSessionNumber: nextSessionNumber,
+      currentSessionStartedAt: now,
+    }
+  })
+
   revalidatePath('/admin')
   revalidatePath('/admin/sessions')
   revalidatePath('/intern')
   revalidatePath('/admin/interns')
 
-  return { endedCount: activeSessions.length, startedCount: uniqueInternIds.length }
+  return {
+    endedCount: activeSessions.length,
+    startedCount: uniqueInternIds.length,
+    archivedYear: archiveYear,
+    archivedSessionNumber: archiveSessionNumber,
+  }
+}
+
+export async function getInternSessionHistorySummary(internId: string) {
+  const session = await auth()
+  if (!session || !session.user) throw new Error("Unauthorized")
+
+  const role = (session.user as any).role as string
+  const userId = (session.user as any).id as string
+
+  if (role !== 'ADMIN' && userId !== internId) {
+    throw new Error("Unauthorized")
+  }
+
+  const records = await prisma.sessionHistory.findMany({
+    orderBy: [{ year: 'desc' }, { sessionNumber: 'desc' }],
+    take: 30,
+  })
+
+  return records.map((record) => {
+    const snapshot = record.snapshot as any
+    const leaderboard = Array.isArray(snapshot?.leaderboard) ? snapshot.leaderboard : []
+    const wins = Array.isArray(snapshot?.winners)
+      ? snapshot.winners.some((winner: any) => winner?.internId === internId)
+      : false
+
+    const rankIndex = leaderboard.findIndex((item: any) => item?.internId === internId)
+    const item = rankIndex >= 0 ? leaderboard[rankIndex] : null
+
+    return {
+      id: record.id,
+      year: record.year,
+      sessionNumber: record.sessionNumber,
+      endedAt: record.endedAt,
+      rank: rankIndex >= 0 ? rankIndex + 1 : null,
+      completedTasks: item?.completed ?? 0,
+      score: item?.score ?? 0,
+      totalHours: item?.totalHours ?? 0,
+      winner: wins,
+    }
+  })
 }
 
 type AdminDirectChatVolunteer = {

@@ -39,12 +39,32 @@ type SessionItem = {
   }[]
 }
 
-function formatDateTime(value: string | Date | null) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString()
+type SessionHistoryItem = {
+  id: string
+  year: number
+  sessionNumber: number
+  startedAt: string | Date
+  endedAt: string | Date
+  activeClosed: number
+  snapshot: any
 }
 
-export default function AdminSessionsCenter({ sessions }: { sessions: SessionItem[] }) {
+function formatDateTime(value: string | Date | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return `${date.toISOString().slice(0, 19).replace('T', ' ')} UTC`
+}
+
+export default function AdminSessionsCenter({
+  sessions,
+  current,
+  history,
+}: {
+  sessions: SessionItem[]
+  current: { year: number; sessionNumber: number; startedAt: string | Date }
+  history: SessionHistoryItem[]
+}) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [searchTerm, setSearchTerm] = useState('')
@@ -81,7 +101,7 @@ export default function AdminSessionsCenter({ sessions }: { sessions: SessionIte
     startTransition(async () => {
       try {
         const result = await endAllActiveWorkSessions()
-        alert(`${result.endedCount} active sessions completed and ${result.startedCount} new sessions started.`)
+        alert(`Session ${result.archivedYear}-${result.archivedSessionNumber} archived. ${result.endedCount} active sessions completed and ${result.startedCount} new sessions started.`)
         router.refresh()
       } catch (error) {
         alert(error instanceof Error ? error.message : 'Failed to end sessions')
@@ -107,6 +127,21 @@ export default function AdminSessionsCenter({ sessions }: { sessions: SessionIte
         <div className="p-5 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-100 dark:bg-purple-900/30">
           <p className="text-sm text-gray-600 dark:text-gray-400">Volunteers Active</p>
           <h3 className="text-3xl font-bold text-purple-700 dark:text-purple-300 mt-1">{volunteersWithActive}</h3>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Current Year Cycle</p>
+          <h3 className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">{current.year}</h3>
+        </div>
+        <div className="p-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Current Session Number</p>
+          <h3 className="text-2xl font-bold text-sky-700 dark:text-sky-300">#{current.sessionNumber}</h3>
+        </div>
+        <div className="p-4 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Current Session Started</p>
+          <h3 className="text-sm font-semibold text-teal-700 dark:text-teal-300 mt-1">{formatDateTime(current.startedAt)}</h3>
         </div>
       </div>
 
@@ -147,7 +182,7 @@ export default function AdminSessionsCenter({ sessions }: { sessions: SessionIte
             disabled={isPending || activeCount === 0}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
           >
-            <ShieldAlert size={18} /> End & Start New Session Cycle
+            <ShieldAlert size={18} /> End Session
           </button>
         </div>
       </div>
@@ -226,6 +261,32 @@ export default function AdminSessionsCenter({ sessions }: { sessions: SessionIte
               </div>
             </details>
           ))
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 space-y-3">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Archived Session History</h3>
+        {history.length === 0 ? (
+          <p className="text-sm text-gray-500">No archived sessions yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {history.map((item) => {
+              const winners = Array.isArray(item.snapshot?.winners) ? item.snapshot.winners : []
+              return (
+                <div key={item.id} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Session {item.year}-{item.sessionNumber}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formatDateTime(item.startedAt)} → {formatDateTime(item.endedAt)} • Active closed: {item.activeClosed}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Winners: {winners.length ? winners.map((w: any) => w.name).join(', ') : 'No winners recorded'}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>

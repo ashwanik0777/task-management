@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import InternTaskCard from "@/components/InternTaskCard"
 import { CheckCircle, Clock, AlertCircle, Layout, MessageSquare } from "lucide-react"
 import Link from "next/link"
+import { getInternSessionHistorySummary } from "@/app/actions"
 
 export default async function InternPage() {
   const session = await auth()
@@ -36,6 +37,7 @@ export default async function InternPage() {
       submissions: true 
     }
   })
+  const sessionHistory = await getInternSessionHistorySummary((session.user as any).id)
 
   const stats = [
     { 
@@ -96,6 +98,36 @@ export default async function InternPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+          <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
+          Previous Session Contribution
+        </h2>
+
+        {sessionHistory.length === 0 ? (
+          <div className="text-sm text-gray-500 bg-white/50 dark:bg-gray-900/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6">
+            No archived session history yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {sessionHistory.slice(0, 9).map((entry) => (
+              <div key={entry.id} className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Session {entry.year}-{entry.sessionNumber}</p>
+                <p className="text-xs text-gray-500 mt-1">Ended: {new Date(entry.endedAt).toLocaleString()}</p>
+                <div className="mt-3 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                  <p>Rank: {entry.rank ? `#${entry.rank}` : 'Not ranked'}</p>
+                  <p>Completed Tasks: {entry.completedTasks}</p>
+                  <p>Hours: {entry.totalHours}</p>
+                  <p>Score: {entry.score}</p>
+                  <p>Winner: {entry.winner ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
       </div>
 
       <div className="space-y-6">
