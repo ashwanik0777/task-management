@@ -526,3 +526,103 @@ export async function addSessionReview(sessionId: string, note: string) {
   revalidatePath('/intern')
   revalidatePath(`/admin/interns/${workSession.internId}`)
 }
+
+type AdminSessionListItem = {
+  id: string
+  status: string
+  startedAt: Date
+  completedAt: Date | null
+  summary: string | null
+  intern: {
+    id: string
+    name: string
+    email: string
+    rollNumber: string | null
+  }
+  reviews: {
+    id: string
+    note: string
+    createdAt: Date
+    reviewer: {
+      id: string
+      name: string
+      role: string
+    }
+  }[]
+  messages: {
+    id: string
+    message: string
+    createdAt: Date
+    sender: {
+      id: string
+      name: string
+      role: string
+    }
+  }[]
+}
+
+export async function getAllWorkSessionsForAdmin(): Promise<AdminSessionListItem[]> {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
+
+  return prisma.workSession.findMany({
+    include: {
+      intern: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          rollNumber: true
+        }
+      },
+      reviews: {
+        include: {
+          reviewer: {
+            select: {
+              id: true,
+              name: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      },
+      messages: {
+        include: {
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }
+    },
+    orderBy: { startedAt: 'desc' }
+  })
+}
+
+export async function endAllActiveWorkSessions() {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
+
+  const now = new Date()
+
+  const result = await prisma.workSession.updateMany({
+    where: { status: 'ACTIVE' },
+    data: {
+      status: 'COMPLETED',
+      completedAt: now,
+      summary: 'Bulk ended by admin'
+    }
+  })
+
+  revalidatePath('/admin')
+  revalidatePath('/admin/sessions')
+  revalidatePath('/intern')
+  revalidatePath('/admin/interns')
+
+  return result.count
+}

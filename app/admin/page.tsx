@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import CreateTaskForm from "@/components/CreateTaskForm"
 import AdminTaskList from "@/components/AdminTaskList"
 import { getInterns } from "@/app/actions"
-import { CheckCircle, Clock, AlertCircle, ListTodo, Users, LayoutDashboard, Trophy, Award } from "lucide-react"
+import { CheckCircle, Clock, AlertCircle, ListTodo, Users, LayoutDashboard, Trophy, Award, PanelTop } from "lucide-react"
 
 export default async function AdminPage() {
   const session = await auth()
@@ -77,10 +77,16 @@ export default async function AdminPage() {
             Admin Dashboard
           </h1>
         </div>
-        <a href="/admin/interns" className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
-          <Users size={20} className="text-purple-600" />
-          <span className="font-medium">Manage Interns</span>
-        </a>
+        <div className="flex items-center gap-2">
+          <a href="/admin/sessions" className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
+            <PanelTop size={20} className="text-indigo-600" />
+            <span className="font-medium">Sessions</span>
+          </a>
+          <a href="/admin/interns" className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
+            <Users size={20} className="text-purple-600" />
+            <span className="font-medium">Manage Interns</span>
+          </a>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
