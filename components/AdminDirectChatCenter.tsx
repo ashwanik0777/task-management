@@ -115,7 +115,6 @@ export default function AdminDirectChatCenter({
           conversationId={selectedConversationId ?? null}
           currentUserId={currentUserId}
           title={selectedVolunteer ? `Chat with ${selectedVolunteer.name}` : 'Volunteer Chat'}
-          subtitle="Admin can message any volunteer directly. Chat stays continuous even when work sessions change."
         />
       </div>
     </div>
