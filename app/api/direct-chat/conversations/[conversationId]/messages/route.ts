@@ -30,7 +30,7 @@ async function validateConversationAccess(conversationId: string) {
     select: {
       id: true,
       internId: true,
-      adminId: true
+      adminId: true,
     }
   })
 
@@ -46,7 +46,25 @@ async function validateConversationAccess(conversationId: string) {
     return { error: "Unauthorized", status: 401 as const }
   }
 
-  return { conversation, userId }
+  let adminClearedAt: Date | null = null
+  let internClearedAt: Date | null = null
+
+  try {
+    const markerRows = await prisma.$queryRaw<Array<{ adminClearedAt: Date | null; internClearedAt: Date | null }>>`
+      SELECT "adminClearedAt", "internClearedAt"
+      FROM "DirectConversation"
+      WHERE "id" = ${conversationId}
+      LIMIT 1
+    `
+
+    const marker = markerRows[0]
+    adminClearedAt = marker?.adminClearedAt ?? null
+    internClearedAt = marker?.internClearedAt ?? null
+  } catch (error) {
+    console.warn('DirectConversation clear markers unavailable:', error)
+  }
+
+  return { conversation, userId, role, adminClearedAt, internClearedAt }
 }
 
 export async function GET(
@@ -73,8 +91,15 @@ export async function GET(
     return NextResponse.json({ error: "Direct chat is not ready" }, { status: 503 })
   }
 
+  const visibleAfter = access.role === 'ADMIN'
+    ? access.adminClearedAt
+    : access.internClearedAt
+
   const messages = await directMessage.findMany({
-    where: { conversationId },
+    where: {
+      conversationId,
+      ...(visibleAfter ? { createdAt: { gt: visibleAfter } } : {}),
+    },
     include: {
       sender: {
         select: {

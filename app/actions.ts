@@ -679,6 +679,7 @@ export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolun
   const conversations: Array<{
     id: string
     internId: string
+    adminClearedAt: Date | null
     messages: Array<{
       message: string
       createdAt: Date
@@ -688,7 +689,7 @@ export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolun
     include: {
       messages: {
         orderBy: { createdAt: 'desc' },
-        take: 1
+        take: 20
       }
     }
   })
@@ -699,7 +700,12 @@ export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolun
 
   return interns.map((intern) => {
     const conversation = conversationByIntern.get(intern.id)
-    const latestMessage = conversation?.messages[0]
+    const latestMessage = conversation
+      ? conversation.messages.find((message) => {
+          if (!conversation.adminClearedAt) return true
+          return new Date(message.createdAt).getTime() > new Date(conversation.adminClearedAt).getTime()
+        })
+      : undefined
 
     return {
       id: intern.id,
@@ -810,8 +816,8 @@ export async function clearDirectConversationMessages(conversationId: string) {
   const userId = (session.user as any).id as string
   const role = (session.user as any).role as string
 
-  const { directConversation, directMessage } = getDirectChatDelegates()
-  if (!directConversation || !directMessage) {
+  const { directConversation } = getDirectChatDelegates()
+  if (!directConversation) {
     throw new Error("Direct chat is not ready. Run prisma generate and restart server.")
   }
 
@@ -828,9 +834,21 @@ export async function clearDirectConversationMessages(conversationId: string) {
 
   if (!canAccess) throw new Error("Unauthorized")
 
-  await directMessage.deleteMany({
-    where: { conversationId }
-  })
+  const clearAt = new Date()
+
+  if (role === 'ADMIN') {
+    await prisma.$executeRaw`
+      UPDATE "DirectConversation"
+      SET "adminClearedAt" = ${clearAt}
+      WHERE "id" = ${conversationId}
+    `
+  } else {
+    await prisma.$executeRaw`
+      UPDATE "DirectConversation"
+      SET "internClearedAt" = ${clearAt}
+      WHERE "id" = ${conversationId}
+    `
+  }
 
   revalidatePath('/admin/chat')
   revalidatePath('/intern/chat')

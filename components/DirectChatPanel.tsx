@@ -15,8 +15,26 @@ type MessageItem = {
   }
 }
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString()
+function formatMessageTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatMessageDateLabel(value: string) {
+  const current = new Date(value)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+
+  const currentDate = current.toDateString()
+  if (currentDate === today.toDateString()) return 'Today'
+  if (currentDate === yesterday.toDateString()) return 'Yesterday'
+
+  return current.toLocaleDateString([], {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 function mergeById(existing: MessageItem[], incoming: MessageItem[]) {
@@ -50,6 +68,32 @@ export default function DirectChatPanel({
   const [loading, setLoading] = useState(true)
   const [text, setText] = useState('')
   const [isPending, startTransition] = useTransition()
+
+  const groupedItems = (() => {
+    const items: Array<{ type: 'date', key: string, label: string } | { type: 'message', key: string, message: MessageItem }> = []
+    let lastDateKey: string | null = null
+
+    messages.forEach((message) => {
+      const dateKey = new Date(message.createdAt).toDateString()
+
+      if (dateKey !== lastDateKey) {
+        items.push({
+          type: 'date',
+          key: dateKey,
+          label: formatMessageDateLabel(message.createdAt),
+        })
+        lastDateKey = dateKey
+      }
+
+      items.push({
+        type: 'message',
+        key: message.id,
+        message,
+      })
+    })
+
+    return items
+  })()
 
   useEffect(() => {
     if (!conversationId) {
@@ -113,7 +157,7 @@ export default function DirectChatPanel({
   const clearChat = () => {
     if (!conversationId) return
 
-    const confirmed = window.confirm('Clear all messages in this chat? This cannot be undone.')
+    const confirmed = window.confirm('Clear chat for your view only? Messages will remain visible to the other side.')
     if (!confirmed) return
 
     startTransition(async () => {
@@ -149,19 +193,43 @@ export default function DirectChatPanel({
       {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{subtitle}</p>}
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Messages are retained for 7 days and auto-deleted after that.</p>
 
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1 bg-[#f7f7f8] dark:bg-gray-900/40 rounded-lg p-3">
         {loading ? (
           <p className="text-sm text-gray-500">Loading chat...</p>
         ) : messages.length === 0 ? (
           <p className="text-sm text-gray-500">No messages yet.</p>
         ) : (
-          messages.map((msg) => {
+          groupedItems.map((item) => {
+            if (item.type === 'date') {
+              return (
+                <div key={item.key} className="flex justify-center py-1">
+                  <span className="px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                    {item.label}
+                  </span>
+                </div>
+              )
+            }
+
+            const msg = item.message
             const isSelf = msg.sender.id === currentUserId
+
             return (
-              <div key={msg.id} className={`max-w-[86%] p-2.5 rounded-lg text-sm ${isSelf ? 'ml-auto bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'}`}>
-                {!isSelf && <p className="text-xs opacity-80 mb-1">{msg.sender.name} ({msg.sender.role})</p>}
-                <p>{msg.message}</p>
-                <p className="text-[11px] opacity-80 mt-1">{formatDateTime(msg.createdAt)}</p>
+              <div key={item.key} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[82%] px-3 py-2 rounded-2xl text-sm shadow-sm ${
+                  isSelf
+                    ? 'bg-[#d9fdd3] dark:bg-green-900/40 text-gray-900 dark:text-gray-100 rounded-br-md'
+                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md'
+                }`}>
+                  {!isSelf && (
+                    <p className="text-[11px] text-blue-600 dark:text-blue-300 font-medium mb-0.5">
+                      {msg.sender.name} ({msg.sender.role})
+                    </p>
+                  )}
+                  <p className="whitespace-pre-wrap break-words">{msg.message}</p>
+                  <div className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 text-right">
+                    {formatMessageTime(msg.createdAt)}
+                  </div>
+                </div>
               </div>
             )
           })

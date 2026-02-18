@@ -16,6 +16,12 @@ type VolunteerItem = {
   lastMessageAt: string | Date | null
 }
 
+function formatLastSeen(value: string | Date | null) {
+  if (!value) return 'No messages yet'
+  const date = new Date(value)
+  return `Last activity: ${date.toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+}
+
 export default function AdminDirectChatCenter({
   volunteers,
   currentUserId
@@ -60,10 +66,15 @@ export default function AdminDirectChatCenter({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+        <div className="mb-4">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Volunteer Inbox</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Pick any volunteer to open direct support chat.</p>
+        </div>
+
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search volunteer"
+          placeholder="Search by name, email, roll no"
           className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 mb-4"
         />
 
@@ -72,21 +83,30 @@ export default function AdminDirectChatCenter({
             <button
               key={volunteer.id}
               onClick={() => setSelectedVolunteerId(volunteer.id)}
-              className={`w-full text-left p-3 rounded-lg border transition-colors ${selectedVolunteerId === volunteer.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+              className={`w-full text-left p-3 rounded-xl border transition-colors ${selectedVolunteerId === volunteer.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-sm' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
             >
-              <p className="font-medium text-gray-900 dark:text-gray-100">{volunteer.name}</p>
-              <p className="text-xs text-gray-500">{volunteer.email}</p>
-              <p className={`text-[11px] mt-0.5 font-medium ${
-                volunteer.status === 'APPROVED'
-                  ? 'text-green-600'
-                  : volunteer.status === 'REJECTED'
-                    ? 'text-red-600'
-                    : 'text-yellow-600'
-              }`}>
-                Status: {volunteer.status}
-              </p>
-              {volunteer.rollNumber && <p className="text-xs text-blue-600 mt-0.5">{volunteer.rollNumber}</p>}
-              {volunteer.lastMessage && <p className="text-xs text-gray-500 mt-1 line-clamp-1">Last: {volunteer.lastMessage}</p>}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{volunteer.name}</p>
+                  <p className="text-xs text-gray-500">{volunteer.email}</p>
+                </div>
+                <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${
+                  volunteer.status === 'APPROVED'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                    : volunteer.status === 'REJECTED'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                }`}>
+                  {volunteer.status}
+                </span>
+              </div>
+              {volunteer.rollNumber && <p className="text-xs text-blue-600 mt-1">{volunteer.rollNumber}</p>}
+              {volunteer.lastMessage ? (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">{volunteer.lastMessage}</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">No messages yet</p>
+              )}
+              <p className="text-[11px] text-gray-400 mt-1">{formatLastSeen(volunteer.lastMessageAt)}</p>
             </button>
           ))}
         </div>
@@ -94,10 +114,11 @@ export default function AdminDirectChatCenter({
 
       <div className="lg:col-span-2 space-y-3">
         {selectedVolunteer && (
-          <div className="flex items-center justify-between bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3">
+          <div className="flex items-center justify-between bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 shadow-sm">
             <div>
               <p className="font-semibold text-gray-900 dark:text-gray-100">{selectedVolunteer.name}</p>
               <p className="text-sm text-gray-500">{selectedVolunteer.email}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{formatLastSeen(selectedVolunteer.lastMessageAt)}</p>
             </div>
             {!selectedConversationId && (
               <button
@@ -115,6 +136,7 @@ export default function AdminDirectChatCenter({
           conversationId={selectedConversationId ?? null}
           currentUserId={currentUserId}
           title={selectedVolunteer ? `Chat with ${selectedVolunteer.name}` : 'Volunteer Chat'}
+          subtitle="Live sync support chat — messages stay stable and auto-update."
         />
       </div>
     </div>

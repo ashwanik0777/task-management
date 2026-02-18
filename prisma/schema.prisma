@@ -137,6 +137,8 @@ model DirectConversation {
   intern    User     @relation("DirectChatIntern", fields: [internId], references: [id])
   adminId   String
   admin     User     @relation("DirectChatAdmin", fields: [adminId], references: [id])
+  adminClearedAt DateTime?
+  internClearedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
