@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import bcrypt from "bcryptjs"
 import { sendTaskAssignmentEmail } from "@/lib/mail"
-import { processPendingAdminMessageReminders } from "@/lib/direct-chat"
+import { processPendingAdminMessageReminders, purgeOldDirectMessages } from "@/lib/direct-chat"
 
 export async function createTask(formData: FormData) {
   const session = await auth()
@@ -633,6 +633,7 @@ type AdminDirectChatVolunteer = {
   name: string
   email: string
   rollNumber: string | null
+  status: string
   conversationId: string | null
   lastMessage: string | null
   lastMessageAt: Date | null
@@ -654,13 +655,16 @@ export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolun
     console.error('Reminder processing failed:', error)
   })
 
+  await purgeOldDirectMessages().catch((error) => {
+    console.error('Message retention cleanup failed:', error)
+  })
+
   const adminId = (session.user as any).id as string
   const { directConversation } = getDirectChatDelegates()
 
   const interns = await prisma.user.findMany({
     where: {
-      role: 'INTERN',
-      status: 'APPROVED'
+      role: 'INTERN'
     },
     orderBy: { createdAt: 'desc' }
   })
@@ -671,6 +675,7 @@ export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolun
       name: intern.name,
       email: intern.email,
       rollNumber: intern.rollNumber,
+      status: intern.status,
       conversationId: null,
       lastMessage: null,
       lastMessageAt: null,
@@ -707,6 +712,7 @@ export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolun
       name: intern.name,
       email: intern.email,
       rollNumber: intern.rollNumber,
+      status: intern.status,
       conversationId: conversation?.id ?? null,
       lastMessage: latestMessage?.message ?? null,
       lastMessageAt: latestMessage?.createdAt ?? null
@@ -761,6 +767,10 @@ export async function getInternDirectChatOverview() {
     console.error('Reminder processing failed:', error)
   })
 
+  await purgeOldDirectMessages().catch((error) => {
+    console.error('Message retention cleanup failed:', error)
+  })
+
   const { directConversation } = getDirectChatDelegates()
   if (!directConversation) {
     throw new Error("Direct chat is not ready. Run prisma generate and restart server.")
@@ -797,4 +807,37 @@ export async function getInternDirectChatOverview() {
     admin,
     conversationId: conversation.id
   }
+}
+
+export async function clearDirectConversationMessages(conversationId: string) {
+  const session = await auth()
+  if (!session || !session.user) throw new Error("Unauthorized")
+
+  const userId = (session.user as any).id as string
+  const role = (session.user as any).role as string
+
+  const { directConversation, directMessage } = getDirectChatDelegates()
+  if (!directConversation || !directMessage) {
+    throw new Error("Direct chat is not ready. Run prisma generate and restart server.")
+  }
+
+  const conversation = await directConversation.findUnique({
+    where: { id: conversationId },
+    select: { id: true, adminId: true, internId: true }
+  })
+
+  if (!conversation) throw new Error("Conversation not found")
+
+  const canAccess =
+    (role === 'ADMIN' && conversation.adminId === userId) ||
+    (role === 'INTERN' && conversation.internId === userId)
+
+  if (!canAccess) throw new Error("Unauthorized")
+
+  await directMessage.deleteMany({
+    where: { conversationId }
+  })
+
+  revalidatePath('/admin/chat')
+  revalidatePath('/intern/chat')
 }

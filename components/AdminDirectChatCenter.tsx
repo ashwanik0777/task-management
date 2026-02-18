@@ -10,6 +10,7 @@ type VolunteerItem = {
   name: string
   email: string
   rollNumber: string | null
+  status: string
   conversationId: string | null
   lastMessage: string | null
   lastMessageAt: string | Date | null
@@ -75,6 +76,15 @@ export default function AdminDirectChatCenter({
             >
               <p className="font-medium text-gray-900 dark:text-gray-100">{volunteer.name}</p>
               <p className="text-xs text-gray-500">{volunteer.email}</p>
+              <p className={`text-[11px] mt-0.5 font-medium ${
+                volunteer.status === 'APPROVED'
+                  ? 'text-green-600'
+                  : volunteer.status === 'REJECTED'
+                    ? 'text-red-600'
+                    : 'text-yellow-600'
+              }`}>
+                Status: {volunteer.status}
+              </p>
               {volunteer.rollNumber && <p className="text-xs text-blue-600 mt-0.5">{volunteer.rollNumber}</p>}
               {volunteer.lastMessage && <p className="text-xs text-gray-500 mt-1 line-clamp-1">Last: {volunteer.lastMessage}</p>}
             </button>
@@ -105,7 +115,7 @@ export default function AdminDirectChatCenter({
           conversationId={selectedConversationId ?? null}
           currentUserId={currentUserId}
           title={selectedVolunteer ? `Chat with ${selectedVolunteer.name}` : 'Volunteer Chat'}
-          subtitle="Admin can message any volunteer directly."
+          subtitle="Admin can message any volunteer directly. Chat stays continuous even when work sessions change."
         />
       </div>
     </div>

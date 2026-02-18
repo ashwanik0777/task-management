@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { processPendingAdminMessageReminders } from "@/lib/direct-chat"
+import { processPendingAdminMessageReminders, purgeOldDirectMessages } from "@/lib/direct-chat"
 
 function getDirectChatDelegates() {
   const prismaAny = prisma as any
@@ -55,6 +55,10 @@ export async function GET(
 ) {
   const { conversationId } = await params
 
+  await purgeOldDirectMessages().catch((error) => {
+    console.error('Message retention cleanup failed:', error)
+  })
+
   await processPendingAdminMessageReminders().catch((error) => {
     console.error('Reminder processing failed:', error)
   })
@@ -91,6 +95,10 @@ export async function POST(
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   const { conversationId } = await params
+
+  await purgeOldDirectMessages().catch((error) => {
+    console.error('Message retention cleanup failed:', error)
+  })
 
   const access = await validateConversationAccess(conversationId)
   if ('error' in access) {

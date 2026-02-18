@@ -16,7 +16,7 @@ export default function InternDirectChatCenter({
       conversationId={conversationId}
       currentUserId={currentUserId}
       title={`Chat with ${adminName}`}
-      subtitle="Agar koi dikkat ho to yahi message karein."
+      subtitle="Agar koi dikkat ho to yahi message karein. Chat session changes ke baad bhi same rehti hai."
     />
   )
 }

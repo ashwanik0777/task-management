@@ -1,12 +1,29 @@
 import { prisma } from "@/lib/prisma"
 import { sendChatReminderEmail } from "@/lib/mail"
 
+const DIRECT_CHAT_RETENTION_DAYS = 7
+
+export async function purgeOldDirectMessages() {
+  const directMessage = (prisma as any).directMessage
+  if (!directMessage) return
+
+  const retentionThreshold = new Date(Date.now() - DIRECT_CHAT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
+
+  await directMessage.deleteMany({
+    where: {
+      createdAt: { lt: retentionThreshold }
+    }
+  })
+}
+
 export async function processPendingAdminMessageReminders() {
   const directMessage = (prisma as any).directMessage
   if (!directMessage) {
     console.warn("Direct chat model delegate unavailable. Run prisma generate and restart server.")
     return
   }
+
+  await purgeOldDirectMessages()
 
   const threshold = new Date(Date.now() - 30 * 60 * 1000)
 

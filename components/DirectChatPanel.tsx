@@ -1,7 +1,8 @@
 'use client'
 
+import { clearDirectConversationMessages } from "@/app/actions"
 import { Send } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useTransition } from "react"
 
 type MessageItem = {
   id: string
@@ -32,6 +33,7 @@ export default function DirectChatPanel({
   const [messages, setMessages] = useState<MessageItem[]>([])
   const [loading, setLoading] = useState(false)
   const [text, setText] = useState('')
+  const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
     if (!conversationId) {
@@ -87,6 +89,22 @@ export default function DirectChatPanel({
     setText('')
   }
 
+  const clearChat = () => {
+    if (!conversationId) return
+
+    const confirmed = window.confirm('Clear all messages in this chat? This cannot be undone.')
+    if (!confirmed) return
+
+    startTransition(async () => {
+      try {
+        await clearDirectConversationMessages(conversationId)
+        setMessages([])
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Unable to clear chat')
+      }
+    })
+  }
+
   if (!conversationId) {
     return (
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center text-gray-500 dark:text-gray-400">
@@ -97,10 +115,18 @@ export default function DirectChatPanel({
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex flex-col min-h-[560px]">
-      <div className="mb-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+      <div className="mb-3 border-b border-gray-200 dark:border-gray-700 pb-3 flex items-start justify-between gap-3">
         <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h3>
-        {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
+        <button
+          onClick={clearChat}
+          disabled={isPending || messages.length === 0}
+          className="text-xs px-2.5 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          Clear Chat
+        </button>
       </div>
+      {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{subtitle}</p>}
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Messages are retained for 7 days and auto-deleted after that.</p>
 
       <div className="flex-1 overflow-y-auto space-y-2 pr-1">
         {loading ? (
