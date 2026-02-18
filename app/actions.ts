@@ -386,3 +386,143 @@ export async function incrementViewCount() {
     return 0
   }
 }
+
+type SessionListItem = {
+  id: string
+  internId: string
+  status: string
+  startedAt: Date
+  completedAt: Date | null
+  summary: string | null
+  reviews: {
+    id: string
+    note: string
+    createdAt: Date
+    reviewer: {
+      id: string
+      name: string
+      role: string
+    }
+  }[]
+}
+
+async function canAccessInternSessions(targetInternId: string) {
+  const session = await auth()
+  if (!session || !session.user) throw new Error("Unauthorized")
+
+  const role = (session.user as any).role as string
+  const userId = (session.user as any).id as string
+
+  if (role !== 'ADMIN' && userId !== targetInternId) {
+    throw new Error("Unauthorized")
+  }
+
+  return { session, role, userId }
+}
+
+export async function getInternWorkSessions(internId: string): Promise<SessionListItem[]> {
+  await canAccessInternSessions(internId)
+
+  return prisma.workSession.findMany({
+    where: { internId },
+    include: {
+      reviews: {
+        include: {
+          reviewer: {
+            select: { id: true, name: true, role: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }
+    },
+    orderBy: { startedAt: 'desc' }
+  })
+}
+
+export async function startWorkSession(internId: string) {
+  await canAccessInternSessions(internId)
+
+  const existingActive = await prisma.workSession.findFirst({
+    where: { internId, status: 'ACTIVE' },
+    select: { id: true }
+  })
+
+  if (existingActive) {
+    throw new Error("An active session already exists")
+  }
+
+  const newSession = await prisma.workSession.create({
+    data: {
+      internId,
+      status: 'ACTIVE'
+    }
+  })
+
+  revalidatePath('/intern')
+  revalidatePath(`/admin/interns/${internId}`)
+
+  return newSession
+}
+
+export async function completeWorkSession(sessionId: string, summary: string) {
+  const session = await auth()
+  if (!session || !session.user) throw new Error("Unauthorized")
+
+  const workSession = await prisma.workSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, internId: true, status: true }
+  })
+
+  if (!workSession) throw new Error("Session not found")
+
+  const role = (session.user as any).role as string
+  const userId = (session.user as any).id as string
+
+  if (role !== 'ADMIN' && userId !== workSession.internId) {
+    throw new Error("Unauthorized")
+  }
+
+  if (workSession.status !== 'ACTIVE') {
+    throw new Error("Only active sessions can be completed")
+  }
+
+  await prisma.workSession.update({
+    where: { id: sessionId },
+    data: {
+      status: 'COMPLETED',
+      summary: summary.trim() || null,
+      completedAt: new Date()
+    }
+  })
+
+  revalidatePath('/intern')
+  revalidatePath(`/admin/interns/${workSession.internId}`)
+}
+
+export async function addSessionReview(sessionId: string, note: string) {
+  const session = await auth()
+  if (!session || !session.user || (session.user as any).role !== 'ADMIN') {
+    throw new Error("Unauthorized")
+  }
+
+  const trimmedNote = note.trim()
+  if (!trimmedNote) throw new Error("Review note is required")
+
+  const workSession = await prisma.workSession.findUnique({
+    where: { id: sessionId },
+    select: { internId: true }
+  })
+
+  if (!workSession) throw new Error("Session not found")
+
+  await prisma.sessionReview.create({
+    data: {
+      sessionId,
+      reviewerId: (session.user as any).id,
+      note: trimmedNote
+    }
+  })
+
+  revalidatePath('/intern')
+  revalidatePath(`/admin/interns/${workSession.internId}`)
+}

@@ -1,8 +1,14 @@
 import { prisma } from "@/lib/prisma"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { User, Mail, Calendar, CheckCircle, Clock, XCircle, BookOpen } from "lucide-react"
+import { auth } from "@/auth"
+import { getInternWorkSessions } from "@/app/actions"
+import WorkSessionBoard from "@/components/WorkSessionBoard"
 
 export default async function InternDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') redirect("/")
+
   const { id } = await params
   const intern = await prisma.user.findUnique({
     where: { id },
@@ -18,6 +24,8 @@ export default async function InternDetailPage({ params }: { params: Promise<{ i
   })
 
   if (!intern) return notFound()
+
+  const workSessions = await getInternWorkSessions(intern.id)
 
   const completedTasks = intern.assignedTasks.filter(t => t.status === 'COMPLETED').length
   const pendingTasks = intern.assignedTasks.filter(t => ['PENDING', 'IN_PROGRESS', 'UNDER_REVIEW'].includes(t.status)).length
@@ -92,6 +100,13 @@ export default async function InternDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {/* Tasks List */}
+      <WorkSessionBoard
+        internId={intern.id}
+        currentUserRole={(session.user as any).role}
+        currentUserId={(session.user as any).id}
+        initialSessions={workSessions}
+      />
+
       <div className="space-y-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <BookOpen className="text-blue-600" /> Task History

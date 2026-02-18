@@ -26,6 +26,9 @@ model User {
 
   assignedTasks Task[]    @relation("AssignedTo")
   createdTasks  Task[]    @relation("CreatedBy")
+  workSessions  WorkSession[] @relation("InternSessions")
+  sessionReviews SessionReview[] @relation("SessionReviewsGiven")
+  chatMessages  SessionChatMessage[] @relation("SessionMessagesSent")
 }
 
 model Otp {
@@ -81,4 +84,46 @@ model TimeLog {
 model SiteStats {
   id        String   @id @default(uuid())
   views     Int      @default(0)
+}
+
+model WorkSession {
+  id          String    @id @default(uuid())
+  internId    String
+  intern      User      @relation("InternSessions", fields: [internId], references: [id])
+  status      String    @default("ACTIVE") // "ACTIVE", "COMPLETED"
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  summary     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  reviews     SessionReview[]
+  messages    SessionChatMessage[]
+
+  @@index([internId, status])
+  @@index([startedAt])
+}
+
+model SessionReview {
+  id         String      @id @default(uuid())
+  sessionId  String
+  session    WorkSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reviewerId String
+  reviewer   User        @relation("SessionReviewsGiven", fields: [reviewerId], references: [id])
+  note       String
+  createdAt  DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model SessionChatMessage {
+  id         String      @id @default(uuid())
+  sessionId  String
+  session    WorkSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User        @relation("SessionMessagesSent", fields: [senderId], references: [id])
+  message    String
+  createdAt  DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
 }

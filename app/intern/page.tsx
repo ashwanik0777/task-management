@@ -2,7 +2,9 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import InternTaskCard from "@/components/InternTaskCard"
+import WorkSessionBoard from "@/components/WorkSessionBoard"
 import { CheckCircle, Clock, AlertCircle, Layout } from "lucide-react"
+import { getInternWorkSessions } from "@/app/actions"
 
 export default async function InternPage() {
   const session = await auth()
@@ -35,6 +37,8 @@ export default async function InternPage() {
       submissions: true 
     }
   })
+
+  const workSessions = await getInternWorkSessions((session.user as any).id)
 
   const stats = [
     { 
@@ -94,6 +98,13 @@ export default async function InternPage() {
       </div>
 
       <div className="space-y-6">
+        <WorkSessionBoard
+          internId={(session.user as any).id}
+          currentUserRole={(session.user as any).role}
+          currentUserId={(session.user as any).id}
+          initialSessions={workSessions}
+        />
+
         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
           <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
           Active Tasks
