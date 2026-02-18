@@ -19,6 +19,22 @@ function formatDateTime(value: string) {
   return new Date(value).toLocaleString()
 }
 
+function mergeById(existing: MessageItem[], incoming: MessageItem[]) {
+  const map = new Map<string, MessageItem>()
+
+  existing.forEach((message) => {
+    map.set(message.id, message)
+  })
+
+  incoming.forEach((message) => {
+    map.set(message.id, message)
+  })
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
+}
+
 export default function DirectChatPanel({
   conversationId,
   currentUserId,
@@ -31,7 +47,7 @@ export default function DirectChatPanel({
   subtitle?: string
 }) {
   const [messages, setMessages] = useState<MessageItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [text, setText] = useState('')
   const [isPending, startTransition] = useTransition()
 
@@ -42,21 +58,26 @@ export default function DirectChatPanel({
     }
 
     let mounted = true
+    let isFirstLoad = true
 
     const loadMessages = async () => {
       try {
-        setLoading(true)
+        if (isFirstLoad && mounted) {
+          setLoading(true)
+        }
+
         const response = await fetch(`/api/direct-chat/conversations/${conversationId}/messages`, { cache: 'no-store' })
         if (!response.ok) return
 
         const data = await response.json()
         if (mounted) {
-          setMessages(data.messages ?? [])
+          setMessages((prev) => mergeById(prev, data.messages ?? []))
         }
       } finally {
-        if (mounted) {
+        if (mounted && isFirstLoad) {
           setLoading(false)
         }
+        isFirstLoad = false
       }
     }
 
@@ -85,7 +106,7 @@ export default function DirectChatPanel({
     }
 
     const data = await response.json()
-    setMessages((prev) => [...prev, data.message])
+    setMessages((prev) => mergeById(prev, [data.message]))
     setText('')
   }
 

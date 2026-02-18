@@ -43,6 +43,22 @@ function formatDateTime(input: string | Date | null) {
   return d.toLocaleString()
 }
 
+function mergeById(existing: ChatMessage[], incoming: ChatMessage[]) {
+  const map = new Map<string, ChatMessage>()
+
+  existing.forEach((message) => {
+    map.set(message.id, message)
+  })
+
+  incoming.forEach((message) => {
+    map.set(message.id, message)
+  })
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
+}
+
 export default function WorkSessionBoard({
   internId,
   currentUserRole,
@@ -60,8 +76,9 @@ export default function WorkSessionBoard({
   const [reviewText, setReviewText] = useState('')
   const [messageText, setMessageText] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [loadingMessages, setLoadingMessages] = useState(true)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessions[0]?.id ?? null)
+  const isAdmin = currentUserRole === 'ADMIN'
 
   const activeSession = useMemo(
     () => initialSessions.find((session) => session.status === 'ACTIVE') ?? null,
@@ -82,24 +99,30 @@ export default function WorkSessionBoard({
   useEffect(() => {
     if (!selectedSessionId) {
       setMessages([])
+      setLoadingMessages(false)
       return
     }
 
     let mounted = true
+    let isFirstLoad = true
 
     const loadMessages = async () => {
-      setLoadingMessages(true)
       try {
+        if (isFirstLoad && mounted) {
+          setLoadingMessages(true)
+        }
+
         const response = await fetch(`/api/work-sessions/${selectedSessionId}/chat`, { cache: 'no-store' })
         if (!response.ok) return
         const data = await response.json()
         if (mounted) {
-          setMessages(data.messages ?? [])
+          setMessages((prev) => mergeById(prev, data.messages ?? []))
         }
       } finally {
-        if (mounted) {
+        if (mounted && isFirstLoad) {
           setLoadingMessages(false)
         }
+        isFirstLoad = false
       }
     }
 
@@ -167,7 +190,7 @@ export default function WorkSessionBoard({
       }
 
       const data = await response.json()
-      setMessages((prev) => [...prev, data.message])
+      setMessages((prev) => mergeById(prev, [data.message]))
       setMessageText('')
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Unable to send message')
@@ -182,35 +205,41 @@ export default function WorkSessionBoard({
           <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Work Session Control</h3>
         </div>
 
-        {activeSession ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
-              <Clock3 size={16} />
-              Active session started: {formatDateTime(activeSession.startedAt)}
+        {isAdmin ? (
+          activeSession ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
+                <Clock3 size={16} />
+                Active session started: {formatDateTime(activeSession.startedAt)}
+              </div>
+              <textarea
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                rows={3}
+                placeholder="Session complete hone par yaha work summary likhein..."
+                className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+              />
+              <button
+                onClick={handleCompleteSession}
+                disabled={isPending}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                <CheckCircle2 size={18} /> Mark as Done
+              </button>
             </div>
-            <textarea
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              rows={3}
-              placeholder="Session complete hone par yaha work summary likhein..."
-              className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
-            />
+          ) : (
             <button
-              onClick={handleCompleteSession}
+              onClick={handleStartSession}
               disabled={isPending}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              <CheckCircle2 size={18} /> Mark as Done
+              <PlayCircle size={18} /> Start New Session
             </button>
-          </div>
+          )
         ) : (
-          <button
-            onClick={handleStartSession}
-            disabled={isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            <PlayCircle size={18} /> Start New Session
-          </button>
+          <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+            Session start/complete controls are managed by admin only.
+          </div>
         )}
       </div>
 

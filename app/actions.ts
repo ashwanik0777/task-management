@@ -441,7 +441,8 @@ export async function getInternWorkSessions(internId: string): Promise<SessionLi
 }
 
 export async function startWorkSession(internId: string) {
-  await canAccessInternSessions(internId)
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
 
   const existingActive = await prisma.workSession.findFirst({
     where: { internId, status: 'ACTIVE' },
@@ -467,7 +468,7 @@ export async function startWorkSession(internId: string) {
 
 export async function completeWorkSession(sessionId: string, summary: string) {
   const session = await auth()
-  if (!session || !session.user) throw new Error("Unauthorized")
+  if (!session || !session.user || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
 
   const workSession = await prisma.workSession.findUnique({
     where: { id: sessionId },
@@ -475,13 +476,6 @@ export async function completeWorkSession(sessionId: string, summary: string) {
   })
 
   if (!workSession) throw new Error("Session not found")
-
-  const role = (session.user as any).role as string
-  const userId = (session.user as any).id as string
-
-  if (role !== 'ADMIN' && userId !== workSession.internId) {
-    throw new Error("Unauthorized")
-  }
 
   if (workSession.status !== 'ACTIVE') {
     throw new Error("Only active sessions can be completed")
