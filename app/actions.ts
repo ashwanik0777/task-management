@@ -8,6 +8,22 @@ import bcrypt from "bcryptjs"
 import { sendTaskAssignmentEmail } from "@/lib/mail"
 import { processPendingAdminMessageReminders, purgeOldDirectMessages } from "@/lib/direct-chat"
 
+async function getActiveSessionCycle() {
+  return prisma.sessionCycle.findFirst({
+    where: { status: 'ACTIVE' },
+    orderBy: { startedAt: 'desc' }
+  })
+}
+
+async function getOrCreateActiveSessionCycle() {
+  const active = await getActiveSessionCycle()
+  if (active) return active
+
+  return prisma.sessionCycle.create({
+    data: { status: 'ACTIVE' }
+  })
+}
+
 export async function createTask(formData: FormData) {
   const session = await auth()
   if (!session || (session.user as any).role !== 'ADMIN') {
@@ -21,13 +37,30 @@ export async function createTask(formData: FormData) {
   const assignedToId = formData.get('assignedToId') as string
   const sendEmail = formData.get('sendEmail') === 'on'
 
+  const activeCycle = await getActiveSessionCycle()
+  if (!activeCycle) {
+    throw new Error("No active session cycle. Start a new session cycle from admin sessions page first.")
+  }
+
   if (assignedToId === 'ALL') {
+    const activeSessions = await prisma.workSession.findMany({
+      where: { status: 'ACTIVE', cycleId: activeCycle.id },
+      select: { internId: true }
+    })
+
+    const activeInternIds = activeSessions.map((item) => item.internId)
+
     const interns = await prisma.user.findMany({
       where: {
         role: 'INTERN',
-        status: 'APPROVED'
+        status: 'APPROVED',
+        id: { in: activeInternIds }
       }
     })
+
+    if (interns.length === 0) {
+      throw new Error("No active volunteer sessions found in current cycle.")
+    }
 
     // Create task for each intern
     for (const intern of interns) {
@@ -54,6 +87,19 @@ export async function createTask(formData: FormData) {
       }
     }
   } else {
+    const hasActiveSession = await prisma.workSession.findFirst({
+      where: {
+        internId: assignedToId,
+        status: 'ACTIVE',
+        cycleId: activeCycle.id
+      },
+      select: { id: true }
+    })
+
+    if (!hasActiveSession) {
+      throw new Error("Selected volunteer is not in active session cycle. Please start cycle first.")
+    }
+
     // Single assignment
     const task = await prisma.task.create({
       data: {
@@ -444,8 +490,10 @@ export async function startWorkSession(internId: string) {
   const session = await auth()
   if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
 
+  const activeCycle = await getOrCreateActiveSessionCycle()
+
   const existingActive = await prisma.workSession.findFirst({
-    where: { internId, status: 'ACTIVE' },
+    where: { internId, status: 'ACTIVE', cycleId: activeCycle.id },
     select: { id: true }
   })
 
@@ -456,6 +504,7 @@ export async function startWorkSession(internId: string) {
   const newSession = await prisma.workSession.create({
     data: {
       internId,
+      cycleId: activeCycle.id,
       status: 'ACTIVE'
     }
   })
@@ -604,14 +653,63 @@ export async function endAllActiveWorkSessions() {
   if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
 
   const now = new Date()
+  const activeCycle = await getOrCreateActiveSessionCycle()
 
-  const result = await prisma.workSession.updateMany({
-    where: { status: 'ACTIVE' },
-    data: {
-      status: 'COMPLETED',
-      completedAt: now,
-      summary: 'Bulk ended by admin'
+  const activeSessions = await prisma.workSession.findMany({
+    where: { status: 'ACTIVE', cycleId: activeCycle.id },
+    select: { id: true, internId: true }
+  })
+
+  const approvedInterns = await prisma.user.findMany({
+    where: { role: 'INTERN', status: 'APPROVED' },
+    select: { id: true }
+  })
+
+  const targetInternIds = approvedInterns.map((intern) => intern.id)
+
+  if (targetInternIds.length === 0) {
+    return { endedCount: 0, startedCount: 0 }
+  }
+
+  const activeSessionIds = activeSessions.map((item) => item.id)
+
+  const createdCycle = await prisma.$transaction(async (tx) => {
+    await tx.sessionCycle.update({
+      where: { id: activeCycle.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: now
+      }
+    })
+
+    if (activeSessionIds.length > 0) {
+      await tx.workSession.updateMany({
+        where: { id: { in: activeSessionIds } },
+        data: {
+          status: 'COMPLETED',
+          completedAt: now,
+          summary: 'Session completed by admin rollover'
+        }
+      })
     }
+
+    const nextCycle = await tx.sessionCycle.create({
+      data: {
+        status: 'ACTIVE',
+        startedAt: now
+      }
+    })
+
+    await tx.workSession.createMany({
+      data: targetInternIds.map((internId) => ({
+        internId,
+        cycleId: nextCycle.id,
+        status: 'ACTIVE',
+        startedAt: now
+      }))
+    })
+
+    return nextCycle
   })
 
   revalidatePath('/admin')
@@ -619,7 +717,7 @@ export async function endAllActiveWorkSessions() {
   revalidatePath('/intern')
   revalidatePath('/admin/interns')
 
-  return result.count
+  return { endedCount: activeSessions.length, startedCount: targetInternIds.length, cycleId: createdCycle.id }
 }
 
 type AdminDirectChatVolunteer = {

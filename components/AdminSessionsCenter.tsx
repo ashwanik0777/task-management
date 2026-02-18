@@ -75,13 +75,13 @@ export default function AdminSessionsCenter({ sessions }: { sessions: SessionIte
   const handleEndAll = () => {
     if (activeCount === 0) return
 
-    const confirmEnd = window.confirm('End all active volunteer sessions at once?')
+    const confirmEnd = window.confirm('End all active sessions and immediately start a new session cycle for same volunteers?')
     if (!confirmEnd) return
 
     startTransition(async () => {
       try {
-        const endedCount = await endAllActiveWorkSessions()
-        alert(`${endedCount} active sessions ended successfully.`)
+        const result = await endAllActiveWorkSessions()
+        alert(`${result.endedCount} active sessions completed and ${result.startedCount} new sessions started.`)
         router.refresh()
       } catch (error) {
         alert(error instanceof Error ? error.message : 'Failed to end sessions')
@@ -147,7 +147,7 @@ export default function AdminSessionsCenter({ sessions }: { sessions: SessionIte
             disabled={isPending || activeCount === 0}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
           >
-            <ShieldAlert size={18} /> End All Active Sessions
+            <ShieldAlert size={18} /> End & Start New Session Cycle
           </button>
         </div>
       </div>
