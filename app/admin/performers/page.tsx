@@ -130,6 +130,68 @@ export default async function PerformersPage() {
     };
   }).sort((a, b) => b.score - a.score);
 
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  const nextMonthStart = new Date(monthStart)
+  nextMonthStart.setMonth(nextMonthStart.getMonth() + 1)
+
+  const monthlyCompletedSessions = await prisma.workSession.findMany({
+    where: {
+      status: 'COMPLETED',
+      completedAt: {
+        gte: monthStart,
+        lt: nextMonthStart,
+      }
+    },
+    include: {
+      intern: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          rollNumber: true,
+        }
+      }
+    },
+    orderBy: {
+      completedAt: 'asc'
+    }
+  })
+
+  const monthlyWinners = monthlyCompletedSessions.map((session, index) => ({
+    sessionNo: index + 1,
+    sessionId: session.id,
+    winner: session.intern,
+    completedAt: session.completedAt,
+    summary: session.summary,
+  }))
+
+  const monthlyWinCountByIntern = new Map<string, {
+    intern: {
+      id: string
+      name: string
+      email: string
+      rollNumber: string | null
+    },
+    wins: number,
+  }>()
+
+  monthlyWinners.forEach(({ winner }) => {
+    const current = monthlyWinCountByIntern.get(winner.id)
+    if (current) {
+      current.wins += 1
+    } else {
+      monthlyWinCountByIntern.set(winner.id, {
+        intern: winner,
+        wins: 1,
+      })
+    }
+  })
+
+  const monthlyLeaderboard = Array.from(monthlyWinCountByIntern.values()).sort((a, b) => b.wins - a.wins)
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="flex items-center gap-4 mb-8">
@@ -147,6 +209,56 @@ export default async function PerformersPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Session Winners (This Month)</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            This month total completed sessions: <span className="font-bold text-blue-600 dark:text-blue-400">{monthlyWinners.length}</span>.
+            {' '}Each completed session has one winner.
+          </p>
+
+          {monthlyWinners.length === 0 ? (
+            <div className="text-sm text-gray-500">No completed sessions in this month yet.</div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {monthlyWinners.map((item) => (
+                <div key={item.sessionId} className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Session #{item.sessionNo}</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{item.winner.name}</p>
+                      <p className="text-xs text-gray-500">{item.winner.email}{item.winner.rollNumber ? ` • ${item.winner.rollNumber}` : ''}</p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 inline-flex items-center gap-1">
+                      <Trophy size={12} /> Winner
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Completed: {item.completedAt ? new Date(item.completedAt).toLocaleString() : '—'}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
+                    {item.summary || 'No session summary provided.'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {monthlyLeaderboard.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300 mb-3">Monthly Session Rank</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {monthlyLeaderboard.map((entry, index) => (
+                  <div key={entry.intern.id} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white dark:bg-gray-900">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">#{index + 1} {entry.intern.name}</p>
+                      <p className="text-xs text-gray-500">{entry.intern.rollNumber || entry.intern.email}</p>
+                    </div>
+                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{entry.wins} session wins</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {performers.map((intern, index) => (
           <div key={intern.id} className="relative bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden group hover:scale-[1.01] transition-transform duration-300">
             {/* Rank Badge */}

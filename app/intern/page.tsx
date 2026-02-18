@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import InternTaskCard from "@/components/InternTaskCard"
 import WorkSessionBoard from "@/components/WorkSessionBoard"
-import { CheckCircle, Clock, AlertCircle, Layout, MessageSquare } from "lucide-react"
+import { CheckCircle, Clock, AlertCircle, Layout, MessageSquare, Trophy } from "lucide-react"
 import { getInternWorkSessions } from "@/app/actions"
 import Link from "next/link"
 
@@ -40,6 +40,44 @@ export default async function InternPage() {
   })
 
   const workSessions = await getInternWorkSessions((session.user as any).id)
+
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  const nextMonthStart = new Date(monthStart)
+  nextMonthStart.setMonth(nextMonthStart.getMonth() + 1)
+
+  const approvedInterns = await prisma.user.findMany({
+    where: { role: 'INTERN', status: 'APPROVED' },
+    select: { id: true }
+  })
+
+  const completedMonthlySessions = await prisma.workSession.findMany({
+    where: {
+      status: 'COMPLETED',
+      completedAt: {
+        gte: monthStart,
+        lt: nextMonthStart,
+      }
+    },
+    select: { internId: true }
+  })
+
+  const monthlyCountMap = new Map<string, number>()
+  completedMonthlySessions.forEach((row) => {
+    monthlyCountMap.set(row.internId, (monthlyCountMap.get(row.internId) || 0) + 1)
+  })
+
+  const monthlySessionRankList = approvedInterns
+    .map((intern) => ({
+      id: intern.id,
+      wins: monthlyCountMap.get(intern.id) || 0,
+    }))
+    .sort((a, b) => b.wins - a.wins || a.id.localeCompare(b.id))
+
+  const currentInternRank = monthlySessionRankList.findIndex((entry) => entry.id === (session.user as any).id) + 1
+  const currentInternSessionWins = monthlyCountMap.get((session.user as any).id) || 0
 
   const stats = [
     { 
@@ -100,6 +138,19 @@ export default async function InternPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="p-6 rounded-xl border border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/30">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Session Rank (This Month)</p>
+            <h3 className="text-3xl font-bold mt-2 text-yellow-700 dark:text-yellow-300">#{currentInternRank || '-'}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              You have won <span className="font-bold">{currentInternSessionWins}</span> sessions this month.
+            </p>
+          </div>
+          <Trophy className="text-yellow-600 dark:text-yellow-300" size={28} />
+        </div>
       </div>
 
       <div className="space-y-6">
