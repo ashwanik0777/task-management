@@ -3,8 +3,9 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import InternTaskCard from "@/components/InternTaskCard"
 import WorkSessionBoard from "@/components/WorkSessionBoard"
-import { CheckCircle, Clock, AlertCircle, Layout } from "lucide-react"
+import { CheckCircle, Clock, AlertCircle, Layout, MessageSquare } from "lucide-react"
 import { getInternWorkSessions } from "@/app/actions"
+import Link from "next/link"
 
 export default async function InternPage() {
   const session = await auth()
@@ -81,6 +82,10 @@ export default async function InternPage() {
             <p className="text-gray-500 dark:text-gray-400">Welcome back, {session.user?.name}</p>
           </div>
         </div>
+        <Link href="/intern/chat" className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
+          <MessageSquare size={18} className="text-indigo-600" />
+          <span className="font-medium">Chat with Admin</span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

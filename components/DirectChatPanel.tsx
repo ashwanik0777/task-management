@@ -1,0 +1,141 @@
+'use client'
+
+import { Send } from "lucide-react"
+import { useEffect, useState } from "react"
+
+type MessageItem = {
+  id: string
+  message: string
+  createdAt: string
+  sender: {
+    id: string
+    name: string
+    role: string
+  }
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString()
+}
+
+export default function DirectChatPanel({
+  conversationId,
+  currentUserId,
+  title,
+  subtitle
+}: {
+  conversationId: string | null
+  currentUserId: string
+  title: string
+  subtitle?: string
+}) {
+  const [messages, setMessages] = useState<MessageItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [text, setText] = useState('')
+
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([])
+      return
+    }
+
+    let mounted = true
+
+    const loadMessages = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/direct-chat/conversations/${conversationId}/messages`, { cache: 'no-store' })
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (mounted) {
+          setMessages(data.messages ?? [])
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadMessages()
+    const timer = setInterval(loadMessages, 3000)
+
+    return () => {
+      mounted = false
+      clearInterval(timer)
+    }
+  }, [conversationId])
+
+  const sendMessage = async () => {
+    if (!conversationId || !text.trim()) return
+
+    const response = await fetch(`/api/direct-chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text.trim() })
+    })
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      alert(data.error || 'Unable to send message')
+      return
+    }
+
+    const data = await response.json()
+    setMessages((prev) => [...prev, data.message])
+    setText('')
+  }
+
+  if (!conversationId) {
+    return (
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center text-gray-500 dark:text-gray-400">
+        Select a volunteer to start chat.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex flex-col min-h-[560px]">
+      <div className="mb-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h3>
+        {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        {loading ? (
+          <p className="text-sm text-gray-500">Loading chat...</p>
+        ) : messages.length === 0 ? (
+          <p className="text-sm text-gray-500">No messages yet.</p>
+        ) : (
+          messages.map((msg) => {
+            const isSelf = msg.sender.id === currentUserId
+            return (
+              <div key={msg.id} className={`max-w-[86%] p-2.5 rounded-lg text-sm ${isSelf ? 'ml-auto bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'}`}>
+                {!isSelf && <p className="text-xs opacity-80 mb-1">{msg.sender.name} ({msg.sender.role})</p>}
+                <p>{msg.message}</p>
+                <p className="text-[11px] opacity-80 mt-1">{formatDateTime(msg.createdAt)}</p>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type your message..."
+          className="flex-1 p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+        />
+        <button
+          onClick={sendMessage}
+          disabled={!text.trim()}
+          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          <Send size={15} /> Send
+        </button>
+      </div>
+    </div>
+  )
+}

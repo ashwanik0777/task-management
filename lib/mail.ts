@@ -95,3 +95,44 @@ export async function sendOtpEmail(to: string, otp: string) {
     throw error;
   }
 }
+
+export async function sendChatReminderEmail(to: string, adminName: string, message: string) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    console.error("SMTP credentials missing. Check SMTP_HOST, SMTP_USER, and SMTP_PASSWORD.")
+    return
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+  const mailOptions = {
+    from: process.env.SMTP_FROM_EMAIL || '"TaskMaster" <no-reply@taskmaster.com>',
+    to,
+    subject: `Reminder: Admin message pending your reply`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Admin Message Reminder</h2>
+        <p>Hello,</p>
+        <p>You received a message from <strong>${adminName}</strong> and reply is still pending for more than 30 minutes.</p>
+
+        <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 18px 0;">
+          <p style="margin: 0; color: #111827;"><strong>Message:</strong></p>
+          <p style="margin: 8px 0 0; color: #374151;">${message}</p>
+        </div>
+
+        <a href="${appUrl}/intern/chat"
+           style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+           Open Chat and Reply
+        </a>
+      </div>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log("Chat reminder sent: %s", info.messageId)
+    return info
+  } catch (error) {
+    console.error("Error sending chat reminder:", error)
+    throw error
+  }
+}

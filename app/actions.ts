@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import bcrypt from "bcryptjs"
 import { sendTaskAssignmentEmail } from "@/lib/mail"
+import { processPendingAdminMessageReminders } from "@/lib/direct-chat"
 
 export async function createTask(formData: FormData) {
   const session = await auth()
@@ -625,4 +626,175 @@ export async function endAllActiveWorkSessions() {
   revalidatePath('/admin/interns')
 
   return result.count
+}
+
+type AdminDirectChatVolunteer = {
+  id: string
+  name: string
+  email: string
+  rollNumber: string | null
+  conversationId: string | null
+  lastMessage: string | null
+  lastMessageAt: Date | null
+}
+
+function getDirectChatDelegates() {
+  const prismaAny = prisma as any
+  return {
+    directConversation: prismaAny.directConversation,
+    directMessage: prismaAny.directMessage,
+  }
+}
+
+export async function getAdminDirectChatOverview(): Promise<AdminDirectChatVolunteer[]> {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
+
+  await processPendingAdminMessageReminders().catch((error) => {
+    console.error('Reminder processing failed:', error)
+  })
+
+  const adminId = (session.user as any).id as string
+  const { directConversation } = getDirectChatDelegates()
+
+  const interns = await prisma.user.findMany({
+    where: {
+      role: 'INTERN',
+      status: 'APPROVED'
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (!directConversation) {
+    return interns.map((intern) => ({
+      id: intern.id,
+      name: intern.name,
+      email: intern.email,
+      rollNumber: intern.rollNumber,
+      conversationId: null,
+      lastMessage: null,
+      lastMessageAt: null,
+    }))
+  }
+
+  const conversations: Array<{
+    id: string
+    internId: string
+    messages: Array<{
+      message: string
+      createdAt: Date
+    }>
+  }> = await directConversation.findMany({
+    where: { adminId },
+    include: {
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 1
+      }
+    }
+  })
+
+  const conversationByIntern = new Map<string, (typeof conversations)[number]>(
+    conversations.map((conversation) => [conversation.internId, conversation])
+  )
+
+  return interns.map((intern) => {
+    const conversation = conversationByIntern.get(intern.id)
+    const latestMessage = conversation?.messages[0]
+
+    return {
+      id: intern.id,
+      name: intern.name,
+      email: intern.email,
+      rollNumber: intern.rollNumber,
+      conversationId: conversation?.id ?? null,
+      lastMessage: latestMessage?.message ?? null,
+      lastMessageAt: latestMessage?.createdAt ?? null
+    }
+  })
+}
+
+export async function createOrGetDirectConversation(internId: string) {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
+
+  const { directConversation } = getDirectChatDelegates()
+  if (!directConversation) {
+    throw new Error("Direct chat is not ready. Run prisma generate and restart server.")
+  }
+
+  const adminId = (session.user as any).id as string
+
+  const intern = await prisma.user.findUnique({
+    where: { id: internId },
+    select: { id: true, role: true }
+  })
+
+  if (!intern || intern.role !== 'INTERN') throw new Error("Invalid volunteer")
+
+  const conversation = await directConversation.upsert({
+    where: {
+      internId_adminId: {
+        internId,
+        adminId
+      }
+    },
+    update: {},
+    create: {
+      internId,
+      adminId
+    },
+    select: { id: true }
+  })
+
+  revalidatePath('/admin/chat')
+  revalidatePath('/intern/chat')
+
+  return conversation.id
+}
+
+export async function getInternDirectChatOverview() {
+  const session = await auth()
+  if (!session || (session.user as any).role !== 'INTERN') throw new Error("Unauthorized")
+
+  await processPendingAdminMessageReminders().catch((error) => {
+    console.error('Reminder processing failed:', error)
+  })
+
+  const { directConversation } = getDirectChatDelegates()
+  if (!directConversation) {
+    throw new Error("Direct chat is not ready. Run prisma generate and restart server.")
+  }
+
+  const internId = (session.user as any).id as string
+
+  const admin = await prisma.user.findFirst({
+    where: { role: 'ADMIN' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, name: true, email: true }
+  })
+
+  if (!admin) {
+    throw new Error("No admin user found")
+  }
+
+  const conversation = await directConversation.upsert({
+    where: {
+      internId_adminId: {
+        internId,
+        adminId: admin.id
+      }
+    },
+    update: {},
+    create: {
+      internId,
+      adminId: admin.id
+    },
+    select: { id: true }
+  })
+
+  return {
+    admin,
+    conversationId: conversation.id
+  }
 }

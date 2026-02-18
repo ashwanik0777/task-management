@@ -29,6 +29,9 @@ model User {
   workSessions  WorkSession[] @relation("InternSessions")
   sessionReviews SessionReview[] @relation("SessionReviewsGiven")
   chatMessages  SessionChatMessage[] @relation("SessionMessagesSent")
+  directChatsAsIntern DirectConversation[] @relation("DirectChatIntern")
+  directChatsAsAdmin DirectConversation[] @relation("DirectChatAdmin")
+  directMessages DirectMessage[] @relation("DirectMessageSender")
 }
 
 model Otp {
@@ -126,4 +129,34 @@ model SessionChatMessage {
   createdAt  DateTime    @default(now())
 
   @@index([sessionId, createdAt])
+}
+
+model DirectConversation {
+  id        String   @id @default(uuid())
+  internId  String
+  intern    User     @relation("DirectChatIntern", fields: [internId], references: [id])
+  adminId   String
+  admin     User     @relation("DirectChatAdmin", fields: [adminId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages  DirectMessage[]
+
+  @@unique([internId, adminId])
+  @@index([internId])
+  @@index([adminId])
+}
+
+model DirectMessage {
+  id             String             @id @default(uuid())
+  conversationId String
+  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User               @relation("DirectMessageSender", fields: [senderId], references: [id])
+  message        String
+  reminderSentAt DateTime?
+  createdAt      DateTime           @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
 }

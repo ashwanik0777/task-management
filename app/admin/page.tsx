@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import CreateTaskForm from "@/components/CreateTaskForm"
 import AdminTaskList from "@/components/AdminTaskList"
 import { getInterns } from "@/app/actions"
-import { CheckCircle, Clock, AlertCircle, ListTodo, Users, LayoutDashboard, Trophy, Award, PanelTop } from "lucide-react"
+import { CheckCircle, Clock, AlertCircle, ListTodo, Users, LayoutDashboard, Trophy, Award, PanelTop, MessageSquare } from "lucide-react"
 
 export default async function AdminPage() {
   const session = await auth()
@@ -78,6 +78,10 @@ export default async function AdminPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <a href="/admin/chat" className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
+            <MessageSquare size={20} className="text-blue-600" />
+            <span className="font-medium">Chat</span>
+          </a>
           <a href="/admin/sessions" className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
             <PanelTop size={20} className="text-indigo-600" />
             <span className="font-medium">Sessions</span>
