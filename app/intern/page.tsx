@@ -122,7 +122,7 @@ export default async function InternPage() {
         </div>
         <Link href="/intern/chat" className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
           <MessageSquare size={18} className="text-indigo-600" />
-          <span className="font-medium">Chat with Admin</span>
+          <span className="font-medium">Chat</span>
         </Link>
       </div>
 
