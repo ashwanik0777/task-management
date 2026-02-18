@@ -93,8 +93,6 @@ model WorkSession {
   id          String    @id @default(uuid())
   internId    String
   intern      User      @relation("InternSessions", fields: [internId], references: [id])
-  cycleId     String?
-  cycle       SessionCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
   status      String    @default("ACTIVE") // "ACTIVE", "COMPLETED"
   startedAt   DateTime  @default(now())
   completedAt DateTime?
@@ -107,20 +105,6 @@ model WorkSession {
 
   @@index([internId, status])
   @@index([startedAt])
-  @@index([cycleId])
-}
-
-model SessionCycle {
-  id          String    @id @default(uuid())
-  status      String    @default("ACTIVE") // "ACTIVE", "COMPLETED"
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  sessions    WorkSession[]
-
-  @@index([status, startedAt])
 }
 
 model SessionReview {
