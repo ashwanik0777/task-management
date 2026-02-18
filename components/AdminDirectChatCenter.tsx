@@ -136,7 +136,6 @@ export default function AdminDirectChatCenter({
           conversationId={selectedConversationId ?? null}
           currentUserId={currentUserId}
           title={selectedVolunteer ? `Chat with ${selectedVolunteer.name}` : 'Volunteer Chat'}
-          subtitle="Live sync support chat — messages stay stable and auto-update."
         />
       </div>
     </div>

@@ -191,7 +191,7 @@ export default function DirectChatPanel({
         </button>
       </div>
       {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{subtitle}</p>}
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Messages are retained for 7 days and auto-deleted after that.</p>
+  
 
       <div className="flex-1 overflow-y-auto space-y-2 pr-1 bg-[#f7f7f8] dark:bg-gray-900/40 rounded-lg p-3">
         {loading ? (
