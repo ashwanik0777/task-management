@@ -93,9 +93,11 @@ export default function AdminSessionsCenter({
   }, [sessions, searchTerm, statusFilter])
 
   const handleEndAll = () => {
-    if (activeCount === 0) return
-
-    const confirmEnd = window.confirm('End all active sessions and immediately start a new session cycle for same volunteers?')
+    const confirmEnd = window.confirm(
+      activeCount > 0
+        ? 'End all active sessions and immediately start a new session cycle for same volunteers?'
+        : 'No active sessions are running. Archive current session cycle and start a new one?'
+    )
     if (!confirmEnd) return
 
     startTransition(async () => {
@@ -179,7 +181,7 @@ export default function AdminSessionsCenter({
           <p className="text-sm text-gray-600 dark:text-gray-400">Showing {filteredSessions.length} of {sessions.length} sessions</p>
           <button
             onClick={handleEndAll}
-            disabled={isPending || activeCount === 0}
+            disabled={isPending}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
           >
             <ShieldAlert size={18} /> End Session

@@ -483,6 +483,14 @@ async function buildSessionLeaderboardSnapshot(): Promise<SnapshotLeaderboardIte
     .sort((a, b) => b.score - a.score || b.completed - a.completed)
 }
 
+async function resetTasksForNewSession() {
+  await prisma.$transaction(async (tx) => {
+    await tx.timeLog.deleteMany({})
+    await tx.submission.deleteMany({})
+    await tx.task.deleteMany({})
+  })
+}
+
 export async function getSessionCenterOverview() {
   const session = await auth()
   if (!session || (session.user as any).role !== 'ADMIN') throw new Error("Unauthorized")
@@ -601,6 +609,8 @@ export async function endAllActiveWorkSessions() {
       }
     }
   })
+
+  await resetTasksForNewSession()
 
   if (activeSessions.length === 0) {
     const resetYear = now.getFullYear()
