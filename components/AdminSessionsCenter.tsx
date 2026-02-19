@@ -49,6 +49,18 @@ type SessionHistoryItem = {
   snapshot: any
 }
 
+type HistorySnapshot = {
+  taskOverview?: {
+    totalTasks?: number
+    completedTasks?: number
+    inProgressTasks?: number
+    underReviewTasks?: number
+  }
+  winners?: Array<{ internId: string; name: string; score: number; completed: number; totalHours: number }>
+  leaderboard?: Array<{ internId: string; name: string; score: number; completed: number; totalHours: number }>
+  activeInterns?: Array<{ id: string; name: string; email: string; rollNumber?: string | null }>
+}
+
 function formatDateTime(value: string | Date | null) {
   if (!value) return '—'
   const date = new Date(value)
@@ -273,19 +285,70 @@ export default function AdminSessionsCenter({
         ) : (
           <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
             {history.map((item) => {
-              const winners = Array.isArray(item.snapshot?.winners) ? item.snapshot.winners : []
+              const snapshot = (item.snapshot ?? {}) as HistorySnapshot
+              const winners = Array.isArray(snapshot.winners) ? snapshot.winners : []
+              const leaderboard = Array.isArray(snapshot.leaderboard) ? snapshot.leaderboard : []
+              const activeInterns = Array.isArray(snapshot.activeInterns) ? snapshot.activeInterns : []
+              const overview = snapshot.taskOverview ?? {}
+
               return (
-                <div key={item.id} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    Session {item.year}-{item.sessionNumber}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatDateTime(item.startedAt)} → {formatDateTime(item.endedAt)} • Active closed: {item.activeClosed}
-                  </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    Winners: {winners.length ? winners.map((w: any) => w.name).join(', ') : 'No winners recorded'}
-                  </p>
-                </div>
+                <details key={item.id} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3">
+                  <summary className="list-none cursor-pointer">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      Session {item.year}-{item.sessionNumber}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatDateTime(item.startedAt)} → {formatDateTime(item.endedAt)} • Active closed: {item.activeClosed}
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      Winners: {winners.length ? winners.map((w) => w.name).join(', ') : 'No winners recorded'}
+                    </p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-300 mt-1">Click to open full session data</p>
+                  </summary>
+
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Task Overview</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs">
+                        <div className="p-2 rounded border border-gray-200 dark:border-gray-700">Total: {overview.totalTasks ?? 0}</div>
+                        <div className="p-2 rounded border border-gray-200 dark:border-gray-700">Completed: {overview.completedTasks ?? 0}</div>
+                        <div className="p-2 rounded border border-gray-200 dark:border-gray-700">In Progress: {overview.inProgressTasks ?? 0}</div>
+                        <div className="p-2 rounded border border-gray-200 dark:border-gray-700">Under Review: {overview.underReviewTasks ?? 0}</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Leaderboard</p>
+                      {leaderboard.length === 0 ? (
+                        <p className="text-xs text-gray-500 mt-1">No leaderboard data.</p>
+                      ) : (
+                        <div className="space-y-1 mt-2 max-h-36 overflow-y-auto pr-1">
+                          {leaderboard.map((row, index) => (
+                            <div key={`${item.id}-${row.internId}`} className="text-xs p-2 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                              <span>#{index + 1} {row.name}</span>
+                              <span>Score {row.score} • Tasks {row.completed} • Hours {row.totalHours}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Active Volunteers (when ended)</p>
+                      {activeInterns.length === 0 ? (
+                        <p className="text-xs text-gray-500 mt-1">No active volunteers recorded.</p>
+                      ) : (
+                        <div className="space-y-1 mt-2 max-h-28 overflow-y-auto pr-1">
+                          {activeInterns.map((intern) => (
+                            <div key={`${item.id}-${intern.id}`} className="text-xs p-2 rounded border border-gray-200 dark:border-gray-700">
+                              {intern.name} • {intern.email}{intern.rollNumber ? ` • ${intern.rollNumber}` : ''}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </details>
               )
             })}
           </div>
